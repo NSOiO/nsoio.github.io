@@ -1,0 +1,268 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Quautz2D一些概念的理解 | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="一 、概述iOS支持两套图形API簇：Core Graphics/QuartZ 2D 和OpenGL ES，他们都可以看作是代码版的PS。OpenGL ES是跨平台的图形API，属于OpenGL的一个简化版本。QuartZ 2D是苹果公司开发的一套API，它是Core Graphics Framew">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Quautz2D一些概念的理解"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">Quautz2D一些概念的理解</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2014-02-07</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <h2 id="一_、概述">一 、概述</h2><p>iOS支持两套图形API簇：Core Graphics/QuartZ 2D 和OpenGL ES，他们都可以看作是代码版的PS。OpenGL ES是跨平台的图形API，属于OpenGL的一个简化版本。QuartZ 2D是苹果公司开发的一套API，它是Core Graphics Framework的一部分。需要注意的是：OpenGL ES只是应用程序编程接口，具体的实现会因平台的不同而有所不同。</p>
+<p>我们可以使用Quartz 2D API来实现许多功能，如基本路径的绘制、透明度、描影、绘制阴影、透明层、颜色管理、反锯齿、PDF文档生成和PDF元数据访问。在需要的时候，Quartz 2D还可以借助图形硬件的功能。</p>
+<p>本文主要讲述了Quartz 2D的一些基本概念，如：<br>CG坐标系统、仿射变换、CGContext、GState（CTM、clip path等）及使用CG需要注意的一些问题。</p>
+<!--break-->
+<h2 id="二、一些基本概念">二、一些基本概念</h2><h3 id="2-1_坐标系">2.1 坐标系</h3><p>iOS中存在两种坐标系统，一种是原点在屏幕左上角的左手坐标系统（默认Z轴正方向是垂直于屏幕指向用户），iOS中的UIKit和CALayer使用的就是这种坐标系统；一种是原点在屏幕左下角的右手坐标系统，CoreGraphics使用的就是这种坐标系统。Mac OS中的情况与iOS中还有所不同，这里就不再表述，可以参考文后的链接。</p>
+<p><img src="/images/coregraphics/coordinate.png" alt="image"></p>
+<p>左/右手坐标系统是3D坐标系统。关于左手坐标系统和右手坐标系统的判定如上图所示，大拇指指向Z轴的正方向，其余弯曲四指的方向为<code>旋转正方向</code>，即从X轴正方向—&gt;Y轴正方向，如果能用左手做出以上动作则为左手坐标系统，反之则为右手坐标系统。例如上图中左边的为左手坐标系统，右边的为右手坐标系统。</p>
+<h3 id="2-2_仿射变换">2.2 仿射变换</h3><p>仿射变换，又称仿射映射，是指在几何中，一个向量空间进行一次线性变换并接上一个平移，变换为另一个向量空间。</p>
+<p>为了表示仿射变换，需要使用齐次坐标，即用三维向量 (x, y, 1) 表示二维向量，对于高维来说也是如此。按照这种方法，就可以用矩阵乘法表示变换。 <code>x&#39; = ax +cy + tx; y&#39; = bx + dy +ty</code> ，计算过程如下图所示：</p>
+<p><img src="/images/coregraphics/fangshebianhuan.gif" alt="image"></p>
+<p>比如，我们在CoreGraphics中进行绘图，绘完之后要在UIKit中进行显示，由于两者的坐标系统不同，这个时候就需要进行坐标变换，由于变换是在二维空间进行，所以也属于仿射变换，很容易得到变换矩阵：(假设在3.5英寸屏幕下)</p>
+<pre><code>[1,0,0  0,-1,0  <span class="number">0,320,1</span>]<span class="comment">;    </span>
+</code></pre><p>仿射变换的参数为：</p>
+<pre><code>affineTransform<span class="list">(<span class="keyword">a</span>,b,c,d,tx,ty)</span> = <span class="list">(<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>,<span class="number">0</span>,<span class="number">320</span>)</span>
+</code></pre><p>上面的变换是在用户空间进行变换的，如果要显示在屏幕上，还得再进行一次用户空间—&gt;设备空间的变换。幸运的是，UIKit会自动为我们做这些事情。</p>
+<p>CoreGraphics提供的和仿射变换相关的API和<code>inline function</code>可以在<code>CGAffineTransform.h</code>中找到。</p>
+<h3 id="2-3_CGContext">2.3 CGContext</h3><p>CoreGraphics API所有的操作都是在上下文中进行的，用<code>CGContextRef</code>来表示，上下文可以看作是一块画布，每次在绘制之前都要先备好一块画布。</p>
+<p>在使用UIKit框架中的方法绘图时，需要注意一点，<strong>UIKIt中的绘图API是没有context参数的，只能使用当前context作为自己的context</strong>；UIKit维护着一个context的栈，只有在栈顶的context－－也就是当前context，才能被UIKit使用。可以通过<code>UIGraphicsGetCurrentContext</code>来获取当前的context。</p>
+<p>有两种常见的获取<code>CGContextRef</code>的方法。</p>
+<p>第一种方法是创建一个图片类型的上下文，使用UIKit框架中的方法：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="built_in">UIGraphicsBeginImageContextWithOptions</span> (<span class="built_in">CGSize</span> size, <span class="built_in">BOOL</span> opaque, <span class="built_in">CGFloat</span> scale) ;</span><br></pre></td></tr></table></figure>
+<p>这个API会创建一个处理图片的context，并压入堆栈成为当前context。然后可以在此context中进行绘图操作，并生成图片。通过调用<code>UIGraphicsGetImageFromCurrentImageContext</code>可以从当前context中获取一个UIImage对象。最后，记得调用<code>UIGraphicsEndImageContext</code>来关闭当前context。</p>
+<p>有时候，可能会遇到通过</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">CGContextRef</span> <span class="built_in">CGBitmapContextCreate</span>(<span class="keyword">void</span> *data, size_t width,</span><br><span class="line">  size_t height, size_t bitsPerComponent, size_t bytesPerRow,</span><br><span class="line">  <span class="built_in">CGColorSpaceRef</span> space, <span class="built_in">CGBitmapInfo</span> bitmapInfo)</span><br></pre></td></tr></table></figure>
+<p>来创建一个图形context，如果我们要使用UIKit框架中的API，就得先通过调用</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">UIGraphicsPushContext</span>(<span class="built_in">CGContextRef</span> context)</span><br></pre></td></tr></table></figure>
+<p>将手动创建的context押入堆栈，成为当前context，在绘制完毕之后，还要记得调用</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">UIGraphicsPopContext</span>()</span><br></pre></td></tr></table></figure>
+<p>让当前context出栈。</p>
+<p>第二种方法是重写UIView中的<strong>drawRect</strong>方法，当<strong>drawRect</strong>方法被调用时，UIKIt会自动创建一个context并成为当前conntext，如前所述，这个context可以通过<code>UIGraphicsGetCurrentContext</code>来获取到，在此context所做的绘制操作都将显示在UIView上。</p>
+<h3 id="2-4_CTM">2.4 CTM</h3><p>当我们使用<code>CoreGraphics</code>做图时，使用的是右手坐标系，而绘制结果是通过UIView显示，在上面我们已经知道了两个坐标系的仿射变换是</p>
+<pre><code>affineTransform<span class="list">(<span class="keyword">a</span>,b,c,d,tx,ty)</span> = <span class="list">(<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>,<span class="number">0</span>,<span class="number">320</span>)</span>
+</code></pre><p>不管是CG坐标还是UIView坐标，都是点的坐标，格式是<code>CFFloat</code>类型；而图像最终是显示在屏幕上面，这就牵扯到一个从用户空间 到 设备空间的坐标转换，设备空间的坐标是像素的坐标，所以在视网膜屏下，一个点包含四个像素（这也解释了为什么点的坐标可以是浮点类型），我们可以得出从用户空间到设备空间的仿射变换为</p>
+<pre><code>affineTransform<span class="list">(<span class="keyword">a</span>,b,c,d,tx,ty)</span> = <span class="list">(<span class="number">2</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">2</span>,<span class="number">0</span>,<span class="number">0</span>)</span>
+</code></pre><p>所以，在我们使用CoreGraphics绘图，并且要通过UIView显示时，要经历两次坐标的转换，我们也可以用一个变换来表示这两次坐标的转换</p>
+<pre><code>affineTransform<span class="list">(<span class="keyword">a</span>,b,c,d,tx,ty)</span> = <span class="list">(<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>,<span class="number">0</span>,<span class="number">320</span>)</span> * <span class="list">(<span class="number">2</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">2</span>,<span class="number">0</span>,<span class="number">0</span>)</span> = <span class="list">(<span class="number">2</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">-2</span>,<span class="number">0</span>,<span class="number">960</span>)</span>
+</code></pre><p>这个值就是CTM（current transform matrix），默认值就是上面这个。</p>
+<p>利用CTM，我们可以很轻松让整个context上的对象完成平移、缩放、旋转等操作。</p>
+<h3 id="2-5_GState">2.5 GState</h3><p><code>GState</code>也就是图形状态信息，包含以下内容：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//当前转换矩阵</span></span><br><span class="line">CTM (current transformation matrix)</span><br><span class="line"></span><br><span class="line"><span class="comment">//裁剪路径</span></span><br><span class="line">clip region</span><br><span class="line"></span><br><span class="line">image interpolation quality</span><br><span class="line"></span><br><span class="line"><span class="comment">//线条有关</span></span><br><span class="line">line width</span><br><span class="line">line join</span><br><span class="line">miter limit</span><br><span class="line">line cap</span><br><span class="line">line dash</span><br><span class="line"></span><br><span class="line"><span class="comment">//自定义曲线的平滑度，一般使用默认</span></span><br><span class="line">flatness</span><br><span class="line"></span><br><span class="line"><span class="comment">//是否抗锯齿</span></span><br><span class="line">should anti-alias</span><br><span class="line"></span><br><span class="line"><span class="comment">//渲染目的，位图信息默认是感知渲染，其他是默认渲染；还可以自定义绝对色度、相对色度</span></span><br><span class="line"><span class="comment">//饱和度渲染等</span></span><br><span class="line">rendering intent</span><br><span class="line"></span><br><span class="line"><span class="comment">//填充颜色和描边颜色</span></span><br><span class="line">fill color space</span><br><span class="line">stroke color space</span><br><span class="line">fill color</span><br><span class="line">stroke color</span><br><span class="line"></span><br><span class="line"><span class="comment">//用来确定新的绘图对象如何与已存在的对象混合。比如，默认的普通混合模式下，</span></span><br><span class="line"><span class="comment">//result ＝ alpha ＊forground ＋ （1 － alpha）＊background。</span></span><br><span class="line">alpha value </span><br><span class="line"></span><br><span class="line"><span class="comment">//字体相关</span></span><br><span class="line">font</span><br><span class="line">font size</span><br><span class="line">character spacing</span><br><span class="line">text drawing mode</span><br><span class="line"></span><br><span class="line"> <span class="comment">//阴影参数</span></span><br><span class="line">shadow parameters</span><br><span class="line"></span><br><span class="line"><span class="comment">//模型</span></span><br><span class="line">the pattern phase</span><br><span class="line"></span><br><span class="line"><span class="comment">//字体平滑参数</span></span><br><span class="line">the font smoothing parameter</span><br><span class="line"></span><br><span class="line"> <span class="comment">//颜色混合模式</span></span><br><span class="line">blend mode</span><br></pre></td></tr></table></figure>
+<p>当我们在context上绘图时，需要设定比如线条、字体、裁剪路径等一些信息，context本身维护着一个状态信息堆栈，这样我们在绘图不同的东西时，就可以很方便的切换回之前的状态。<br>通常我们在绘制过程中，经常会使用到以下两个API：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">CGContextSaveGState</span>(context); <span class="comment">// 状态信息入栈</span></span><br><span class="line"><span class="built_in">CGContextRestoreGState</span>(context);<span class="comment">//状态信息出栈</span></span><br></pre></td></tr></table></figure>
+<h3 id="2-6_非零缠绕计数准则和奇数－偶数准则">2.6 非零缠绕计数准则和奇数－偶数准则</h3><p>当我们需要填充或裁剪路径时，有以下两种方法可以选择:</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">CGContextClip</span>(context);</span><br><span class="line"><span class="built_in">CGContextFillPath</span>(context);</span><br><span class="line"> </span><br><span class="line"><span class="built_in">CGContextEOClip</span>(context);</span><br><span class="line"><span class="built_in">CGContextEOFillPath</span>(context);</span><br></pre></td></tr></table></figure>
+<p>其对应的就是两种不同的填充/裁剪路径准则，上面的API默认使用的是<code>winding-number</code>，下面的使用的就是<code>even－odd</code>准则，两种准则的目的都是用于确定某一个点是否被渲染。</p>
+<p>对于填充路径，<code>winding-number</code>的判断方法是这样的：从某一个点从左到右画一条射线，如果路径是以正方向通过射线，则<code>winding－number＋1</code>，否则<code>winding-number - 1</code>，如果最终结果<code>winding-number ！＝ 0</code>,则这个点就会被渲染，否则不会被渲染。</p>
+<p><code>even-odd</code>的判断方法与此类似，不同的是它考察的是射线和路径交点的个数，而和方向无关，如果交点个数为奇数，则此点被渲染，为偶数则不被渲染。</p>
+<p>裁剪路径的方法与此类似。</p>
+<p><img src="/images/coregraphics/wn_eo.gif" alt="image"></p>
+<h3 id="2-7_CGPath">2.7 CGPath</h3><p>我们可以直接在context上绘图，也可以在context上使用路径，但是直接使用会有不可复用的问题（如下面被取代的API所示），所以推荐的做法是先把轨迹组合成一个路径，再把路径添加到context中，这样对于绘制复杂的场景就可以复用这些路径。</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">CGPathCreateMutable</span> <span class="comment">//取代CGContextBeginPath</span></span><br><span class="line"><span class="built_in">CGPathMoveToPoint</span>  <span class="comment">//取代CGContextMoveToPoint</span></span><br><span class="line"><span class="built_in">CGPathAddLineToPoint</span>  <span class="comment">//取代CGContexAddLineToPoint</span></span><br><span class="line"><span class="built_in">CGPathAddCurveToPoint</span>  <span class="comment">//取代CGContexAddCurveToPoint</span></span><br><span class="line"><span class="built_in">CGPathAddEllipseInRect</span>  <span class="comment">//取代CGContexAddEllipseInRect</span></span><br><span class="line"><span class="built_in">CGPathAddArc</span>  <span class="comment">//取代CGContexAddArc</span></span><br><span class="line"><span class="built_in">CGPathAddRect</span>  <span class="comment">//取代CGContexAddRect</span></span><br><span class="line"><span class="built_in">CGPathCloseSubpath</span>  <span class="comment">//取代CGContexClosePath</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">CGContextAddPath</span><span class="comment">//添加路径到上下文</span></span><br></pre></td></tr></table></figure>
+<h3 id="2-8_Transparency_Layers">2.8 Transparency Layers</h3><p>除了在context绘图和使用CGPath之外，我们还可以在Layer上进行绘图，其中包括Transparency Layers（透明层）和CGLayer。透明层有什么作用呢？通过下面两幅图就可以看出差别。</p>
+<p><strong>没有使用透明层</strong></p>
+<p><img src="/images/coregraphics/no_transparence.png" alt="image"></p>
+<p><strong>使用透明层</strong></p>
+<p><img src="/images/coregraphics/transparence.png" alt="image"></p>
+<p>每个context维护一个透明层栈，并且透明层是可以嵌套的。但由于层通常是栈的一部分，所以我们不能单独操作它们。</p>
+<p>我们通过调用函数<code>CGContextBeginTransparencyLayer</code>来开始一个透明层，该函数需要两个参数：图形上下文与CFDictionary对象。字典中包含我们所提供的指定层额外信息的选项，但由于Quartz 2D API中没有使用字典，所以我们传递一个NULL。在调用这个函数后，图形状态参数保持不变，除了alpha值[默认设置为1]、阴影[默认关闭]、混合模式[默认设置为normal]、及其它影响最终组合的参数。</p>
+<p>在开始透明层操作后，我们可以绘制任何想显示在层上的对象。指定上下文中的绘制操作将被当成一个组合对象绘制到一个透明背景上。这个背景被当作一个独立于图形上下文的目标缓存。</p>
+<p>当绘制完成后，我们调用函数CGContextEndTransparencyLayer。Quartz将结合对象放入上下文，并使用上下文的全局alpha值、阴影状态及裁减区域作用于组合对象。</p>
+<p>在透明层中绘制需要三步：</p>
+<ul>
+<li>调用函数CGContextBeginTransparencyLayer</li>
+<li>在透明层中绘制需要组合的对象</li>
+<li>调用函数CGContextEndTransparencyLayer</li>
+</ul>
+<p><img src="/images/coregraphics/transparence_ex.gif" alt="image"></p>
+<p>绘制上图的代码如下：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">void</span> MyDrawTransparencyLayer (<span class="built_in">CGContext</span> myContext, <span class="comment">// 1</span></span><br><span class="line">                                <span class="built_in">CGFloat</span> wd,</span><br><span class="line">                                <span class="built_in">CGFloat</span> ht)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">CGSize</span> myShadowOffset = <span class="built_in">CGSizeMake</span> (<span class="number">10</span>, -<span class="number">20</span>);<span class="comment">// 2</span></span><br><span class="line">    <span class="built_in">CGContextSetShadow</span> (myContext, myShadowOffset, <span class="number">10</span>);   <span class="comment">// 3</span></span><br><span class="line">    <span class="built_in">CGContextBeginTransparencyLayer</span> (myContext, <span class="literal">NULL</span>);<span class="comment">// 4</span></span><br><span class="line">    <span class="comment">// Your drawing code here// 5</span></span><br><span class="line">    <span class="built_in">CGContextSetRGBFillColor</span> (myContext, <span class="number">0</span>, <span class="number">1</span>, <span class="number">0</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">CGContextFillRect</span> (myContext, <span class="built_in">CGRectMake</span> (wd/<span class="number">3</span>+ <span class="number">50</span>,ht/<span class="number">2</span> ,wd/<span class="number">4</span>,ht/<span class="number">4</span>));</span><br><span class="line">    <span class="built_in">CGContextSetRGBFillColor</span> (myContext, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">CGContextFillRect</span> (myContext, <span class="built_in">CGRectMake</span> (wd/<span class="number">3</span>-<span class="number">50</span>,ht/<span class="number">2</span>-<span class="number">100</span>,wd/<span class="number">4</span>,ht/<span class="number">4</span>));</span><br><span class="line">    <span class="built_in">CGContextSetRGBFillColor</span> (myContext, <span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">CGContextFillRect</span> (myContext, <span class="built_in">CGRectMake</span> (wd/<span class="number">3</span>,ht/<span class="number">2</span>-<span class="number">50</span>,wd/<span class="number">4</span>,ht/<span class="number">4</span>));</span><br><span class="line">    <span class="built_in">CGContextEndTransparencyLayer</span> (myContext);<span class="comment">// 6</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="2-9_CGLayer">2.9 CGLayer</h3><p>CGLayer是被设计来复用的，其可以看作是一个子context。如果是绘制一些相当复杂的，并且部分内容需要被重新绘制的，你只需将那部分内容绘制到CGLayer一次，然后便可绘制这个CGLayer到父context中。</p>
+<p>看起来很美好，但是性能并不象传说中那样美好，已不建议使用。</p>
+<h3 id="2-10_Pattern">2.10 Pattern</h3><p>Pattern，即模版，功能上和CGLayer差不多，也是拿来复用的，可以用于填充context，就像我们可以使用颜色去填充context一样，我们也可以使用模版去填充context。</p>
+<p>使用模版比使用其他方法的效率要高很多，具体的例子和效率对比可以参考文后的链接。</p>
+<h3 id="2-11_Blend_Mode">2.11 Blend Mode</h3><p>略.</p>
+<h2 id="总结">总结</h2><p>使用CoreGraphics，从CG坐标到UIKit坐标再到设备坐标，UIKit会为我们设定一个合适的CTM值，我们也可以利用CTM来做自定义的旋转、平移、缩放等操作。我们可以直接在cotext中直接绘图，也可以使用路径来组合轨迹，还可以在透明层上绘制。对于需要重复使用的内容，我们可以使用模版，不但编程简单而且还能提高效率。</p>
+<h2 id="参考资料">参考资料</h2><p><a href="https://developer.apple.com/library/ios/documentation/graphicsimaging/conceptual/drawingwithquartz2d/dq_overview/dq_overview.html#//apple_ref/doc/uid/TP30001066-CH202-TPXREF101" target="_blank" rel="external">Quartz 2D Programming Guide</a></p>
+<p><a href="https://developer.apple.com/library/ios/documentation/graphicsimaging/Reference/CGContext/Reference/reference.html#//apple_ref/doc/uid/TP30000950-CH202-SW1" target="_blank" rel="external">CGContext Reference</a></p>
+<p><a href="https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/CocoaDrawingGuide/Transforms/Transforms.html" target="_blank" rel="external">Cocoa Drawing Guide</a></p>
+<p><a href="http://www.cnblogs.com/pure/archive/2013/03/11/2948454.html" target="_blank" rel="external">Quartz 2D Programming Guide的部分中文翻译</a></p>
+<p><a href="http://www.cnblogs.com/xdream86/archive/2012/12/12/2814552.html" target="_blank" rel="external">iOS绘图教程</a></p>
+<p><a href="http://geeklu.com/2012/06/3d-coordinate-system/" target="_blank" rel="external">Mac，iOS界面中的三维坐标系</a></p>
+<p><a href="http://onevcat.com/2013/04/using-blending-in-ios/" target="_blank" rel="external">iOS中使用blend改变图片颜色</a></p>
+<p><a href="http://www.raywenderlich.com/32283/core-graphics-tutorial-lines-rectangles-and-gradients" target="_blank" rel="external">RayWenderlich上的CG教程</a></p>
+<p><a href="http://bbs.feng.com/read-htm-tid-6880069.html" target="_blank" rel="external">计算机图形的渲染过程</a></p>
+<p><a href="http://objccn.io/issue-3-1/" target="_blank" rel="external">绘制像素到屏幕上</a></p>
+<p><a href="http://iosptl.com/posts/cglayer-no-longer-recommended/" target="_blank" rel="external">CGLayer no longer recommended</a></p>
+<p><a href="http://www.raywenderlich.com/zh-hans/19897/core-graphics-101-%E6%A8%A1%E7%89%88" target="_blank" rel="external">Core Graphics 101: 模版</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev disabled"><a><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2014/02/04/2014-02-04-shi-yong-coregraphicshui-zhi-zhong-jian-lou-kong-de-2dtu-xing-de-5chong-fang-fa/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

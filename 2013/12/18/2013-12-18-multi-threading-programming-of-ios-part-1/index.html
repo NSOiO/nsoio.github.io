@@ -1,0 +1,280 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>iOS多线程编程（1/4)：NSThread | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="在iOS的开发中，多线程编程显得尤为重要，把一些耗时费力的工作放在多线程中去执行有助于提高主线程的响应速度，带来更好的用户体验；随着下一代iPhone6即将推出，有传言其所采用的是四核A8处理器，多线程编程能更好的提高程序的性能。
+Apple提供了不同的技术来支持多线程，除了跨平台的pthread之">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="iOS多线程编程（1/4)：NSThread"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">iOS多线程编程（1/4)：NSThread</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2013-12-18</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <p>在iOS的开发中，多线程编程显得尤为重要，把一些耗时费力的工作放在多线程中去执行有助于提高主线程的响应速度，带来更好的用户体验；随着下一代iPhone6即将推出，有传言其所采用的是四核A8处理器，多线程编程能更好的提高程序的性能。</p>
+<p>Apple提供了不同的技术来支持多线程，除了跨平台的<code>pthread</code>之外，还有<code>NSThread、NSOperationQueue、GCD</code>等，对于pthread编程，<a href="http://www.hrchen.com" target="_blank" rel="external">hrchen</a>推荐了一本不错的书<a href="http://www.amazon.com/Programming-POSIX-Threads-David-Butenhof/dp/0201633922/" target="_blank" rel="external">Programming With POSIX Threads</a>. Part1&amp;2主要讲解NSThread和NSRunLoop，对这些知识的掌握将有助于我们学习后面的GCD等技术。</p>
+<h2 id="NSThread">NSThread</h2><p><a href="http://zh.wikipedia.org/wiki/%E7%BA%BF%E7%A8%8B" target="_blank" rel="external">线程</a>（thread）是构成进程的子单元，操作系统调度器对线程进行单独的调度。包括GCD和NSOperationQueue在内的并发编程API都是基于线程构建的。<code>NSThread</code>是Objective-C对pthread的一个封装，这样对使用者而言就更面向对象一些，比如可以去创建一个NSThrea的子类。</p>
+<p>使用NSThread管理的一个线程的生命周期大致如下所示：</p>
+<blockquote>
+<ul>
+<li>创建一个线程<ul>
+<li>使用NSThread类方法</li>
+<li>使用NSThread实例方法</li>
+<li>使用NSObject的实例方法</li>
+<li>使用NSThread的子类</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li>创建线程入口函数<ul>
+<li>创建自动释放池 －（<strong>必须</strong>）</li>
+<li>设置异常处理 － (try/catch)</li>
+<li>配置线程的属性(name、stackSize、threadDictionary)和优先级</li>
+<li>设置Run Loop</li>
+</ul>
+</li>
+<li>运行线程</li>
+<li>中断或退出线程<!--break-->
+</li>
+</ul>
+</blockquote>
+<h3 id="1-_创建一个线程">1. 创建一个线程</h3><ul>
+<li>使用NSThread类方法 </li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">[<span class="built_in">NSThread</span> detachNewThreadSelector:<span class="keyword">@selector</span>(threadMainRoutine:) toTarget:<span class="keyword">self</span> withObject:<span class="string">@"obj"</span>];</span><br></pre></td></tr></table></figure>
+<ul>
+<li>使用NSThread实例方法</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">NSThread</span> *aThread = [[<span class="built_in">NSThread</span> alloc] initWithTarget:<span class="keyword">self</span> selector:<span class="keyword">@selector</span>(threadMainRoutine:) object:<span class="string">@"obj"</span>];</span><br><span class="line"><span class="keyword">self</span><span class="variable">.myThread</span> = aThread;</span><br><span class="line">[aThread start];</span><br></pre></td></tr></table></figure>
+<ul>
+<li>使用NSObject的实例方法</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">[<span class="keyword">self</span> performSelectorInBackground:<span class="keyword">@selector</span>(threadMainRoutine:) withObject:<span class="string">@"obj"</span>];</span><br></pre></td></tr></table></figure>
+<ul>
+<li>使用NSThread的子类</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">DPCustomThread *cThread = [[DPCustomThread alloc] init];</span><br><span class="line">[cThread start];</span><br></pre></td></tr></table></figure>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)main&#123;</span><br><span class="line">[<span class="keyword">self</span> threadMainRoutine:<span class="string">@"obj"</span>];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>具体代码可以通过文章后面的链接下载.</p>
+<ul>
+<li><p>创建一个线程的主要成本包括构造内核空间（大约1KB，<a href="http://support.apple.com/kb/ht1342" target="_blank" rel="external">wired memory</a>）栈空间(默认主线程1MB，多线程512KB,空间大小可以使用<code>- (void)setStackSize:(NSUInteger)s</code>)来进行设置，s的单位是bytes，注意栈空间必须是4KB的倍数，且最小是16KB，即<code>s&gt;1024*4*i（i&gt;=4）</code>，创建线程大约需要90ms的时间（由于底层内核的支持，Operation Objects可使用内核的常驻线程池里来节省创建时间）。</p>
+</li>
+<li><p>第一种方法和第三种方法是一样的，都会直接生成一个线程。</p>
+</li>
+<li><p>第二种和第四种方法创建的线程好处是可以拥有线程的对象，因此可以使用<code>performSelector:onThread:withObject:waitUntilDone:</code>在该线程上执行方法，这是一种非常方便的线程间通讯的方法（相对于设置麻烦的NSPort用于通讯），所要执行的方法可以直接添加到目标线程的Runloop中执行。Apple建议使用这个接口运行的方法不要是耗时或者频繁的操作，以免子线程的负载过重。(第一中和第三种方法也可以通过获取当前线程来间接的来拥有线程的对象)</p>
+</li>
+<li><p>上面四种方法生成的子线程都是detached状态，即主线程结束时这些线程都会被直接杀死；如果要生成joinable状态的子线程，只能使用pthread接口啦。</p>
+</li>
+<li><p>如果需要，可以设置线程的优先级(-setThreadPriority:),尽量还是使用默认的优先级，这样就不会产生优先级反转的问题；如果要在线程中保存一些状态信息，还可以使用到-threadDictionary得到一个NSMutableDictionary，以key-value的方式保存信息用于<code>线程内读写</code>或者<code>线程间传递参数</code>，同时这也是Objective－C实现<a href="http://en.wikipedia.org/wiki/Thread-local_storage#Objective-C" target="_blank" rel="external">TLC（thread－local storage）</a>的方式</p>
+</li>
+</ul>
+<h3 id="2-_NSThread的入口方法">2. NSThread的入口方法</h3><figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)threadMainRoutine:(<span class="keyword">id</span>)object&#123;</span><br><span class="line">    <span class="keyword">@autoreleasepool</span> &#123;</span><br><span class="line">        <span class="built_in">NSLog</span>(<span class="string">@"thread start"</span>);</span><br><span class="line">        <span class="built_in">BOOL</span> moreWorkToDo = <span class="literal">YES</span>;</span><br><span class="line">        <span class="built_in">BOOL</span> exitNow = <span class="literal">NO</span>;</span><br><span class="line">        <span class="built_in">NSRunLoop</span>* runLoop = [<span class="built_in">NSRunLoop</span> currentRunLoop];</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// Add the exitNow BOOL to the thread dictionary.</span></span><br><span class="line">        <span class="built_in">NSMutableDictionary</span>* threadDict = [[<span class="built_in">NSThread</span> currentThread] threadDictionary];</span><br><span class="line">        [threadDict setValue:[<span class="built_in">NSNumber</span> numberWithBool:exitNow] forKey:<span class="string">@"ThreadShouldExitNow"</span>];</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// Install an input source.</span></span><br><span class="line">        [<span class="keyword">self</span> myInstallCustomInputSource];</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">while</span> (moreWorkToDo &amp;&amp; !exitNow)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">// 线程要执行的任务</span></span><br><span class="line">            <span class="comment">// 如果完成了可设置moreWorkToDo ＝ NO</span></span><br><span class="line">            [<span class="keyword">self</span> threadTask];</span><br><span class="line">            </span><br><span class="line">            <span class="comment">// Run the run loop but timeout immediately if the input source isn't waiting to fire.</span></span><br><span class="line">            [runLoop runUntilDate:[<span class="built_in">NSDate</span> date]];</span><br><span class="line">            </span><br><span class="line">            <span class="comment">// Check to see if an input source handler changed the exitNow value.</span></span><br><span class="line">            exitNow = [[threadDict valueForKey:<span class="string">@"ThreadShouldExitNow"</span>] boolValue];</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@"thread exit"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>必须创建一个autoreleasepool，因为多线程不会自动创建，如果线程中需要创建大量的对象，可以在Run Loop的每次迭代处创建再创建一个autoreleasepool</p>
+</li>
+<li><p>如果要捕获异常，可以在线程入口处使用<code>try { } catch { }</code></p>
+</li>
+<li><p>如果多线程处理一次即结束，则无需设置Run Loop；如果要循环处理事件，则使用Run Loop是最好的一种方式；如果线程中使用了定时期，则必须要启动Run Loop。</p>
+</li>
+<li><p>多线程的正常退出应该使用标志位来进行判断，让线程自然退出。</p>
+</li>
+</ul>
+<h3 id="3-_NSThread_的接口">3. NSThread 的接口</h3><figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// nitializing an NSThread Object</span></span><br><span class="line">– init</span><br><span class="line">– initWithTarget:selector:object:</span><br><span class="line"></span><br><span class="line"><span class="comment">// Starting a Thread</span></span><br><span class="line">+ detachNewThreadSelector:toTarget:withObject:</span><br><span class="line"><span class="comment">//1.运行 -main 2.如果是第一个多线程，发出通知：NSWillBecomeMultiThreadedNotification  </span></span><br><span class="line">– start</span><br><span class="line">– main</span><br><span class="line"></span><br><span class="line"><span class="comment">// Stopping a Thread</span></span><br><span class="line">+ sleepUntilDate:</span><br><span class="line">+ sleepForTimeInterval:</span><br><span class="line"><span class="comment">//类方法，强制退出当前线程，发出NSThreadWillExitNotification通知，不建议使用，因为没有机会做清理工作</span></span><br><span class="line">+ exit</span><br><span class="line"><span class="comment">//与 isCanceled配合使用，可用于启动RunLoop的外层循环判断标志</span></span><br><span class="line">– cancel</span><br><span class="line"></span><br><span class="line"><span class="comment">// Determining the Thread’s Execution State</span></span><br><span class="line">– isExecuting</span><br><span class="line">– isFinished</span><br><span class="line">– isCancelled</span><br><span class="line"></span><br><span class="line"><span class="comment">// Working with the Main Thread</span></span><br><span class="line">+ isMainThread</span><br><span class="line">– isMainThread</span><br><span class="line">+ mainThread</span><br><span class="line"></span><br><span class="line"><span class="comment">// Querying the Environment</span></span><br><span class="line">+ isMultiThreaded</span><br><span class="line">+ currentThread</span><br><span class="line">+ callStackReturnAddresses</span><br><span class="line">+ callStackSymbols</span><br><span class="line"></span><br><span class="line"><span class="comment">// Working with Thread Properties</span></span><br><span class="line">– threadDictionary</span><br><span class="line">– name</span><br><span class="line">– setName:</span><br><span class="line">– stackSize</span><br><span class="line">– setStackSize:</span><br><span class="line"></span><br><span class="line"><span class="comment">// Working with Thread Priorities</span></span><br><span class="line">+ threadPriority</span><br><span class="line">– threadPriority</span><br><span class="line">+ setThreadPriority:</span><br><span class="line">– setThreadPriority:</span><br></pre></td></tr></table></figure>
+<h3 id="4-_NSThread_的使用注意事项">4. NSThread 的使用注意事项</h3><ul>
+<li><p>1.）避免直接使用NSThread，Apple推荐使用性能更好的并发编程：GCD和Operation Queue</p>
+</li>
+<li><p>2.）线程消耗了系统的宝贵资源，有些可能是wired memeory，应该合理分配任务到每个线程，保证长时间运行和运行成效（不能让一个线程长时间的处于锁的的等待什么的这类操作）。可以去打断一个长时间处于空闲状态的线程，这样有助于减少内存的占用</p>
+</li>
+<li><p>3.）避免使用不是线程安全的共享资源，如果非使用不可，避免冲突最简单容易的方法是每个线程都使用一个副本！加锁／原子操作同样有性能损耗，所以把避免资源争夺放在首位可以同样得到高性能的程序。</p>
+</li>
+<li><p>4.）对UI进行的所有操作都放在主线程中运行，这样就避免了处理窗口绘图和用户事件的同步问题。</p>
+</li>
+<li><p>5.）如果想在程序退出的时候在多线程中保存数据，使用POSIX API创建非独立线程（可连接线程）及在applicationShouldTerminate中延迟退出。</p>
+</li>
+<li><p>6.）关于异常处理，每一个线程都有自己的堆栈，且一个线程是捕捉不到其他线程的异常的，所以每一个线程都负责捕捉自己的异常，对异常的处理一般是告诉其他线程当前线程发生了什么，然后可以选择继续执行，等待指示或者直接退出，如果捕捉异常失败，则可能引起进程的Crash。</p>
+</li>
+<li><p>7.）不到万不得已，不要使用函数去中断一个线程，让线程自然结束，强行中断可能会妨碍线程的自清理，发生内存泄漏或其他问题。</p>
+</li>
+<li><p>8.）对于类库开发者而言，由于不知道使用者是不是在多线程中使用，只能假设应用程序的调用是在多线程中的，或者是在多线程中切换的，所以你应该总是在临界区进行加锁的处理。</p>
+</li>
+</ul>
+<p>其实这个也是不建议直接使用NSThread的原因，比如你创建了4个线程，而使用的框架也做了同样的事情，最终导致线程数量急剧增加。</p>
+<h2 id="参考资料">参考资料</h2><ul>
+<li><a href="http://www.hrchen.com/2013/06/multi-threading-programming-of-ios-part-1/" target="_blank" rel="external">iOS多线程编程Part 1/3 - NSThread &amp; Run Loop</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/Multithreading/Introduction/Introduction.html#//apple_ref/doc/uid/10000057i-CH1-SW1" target="_blank" rel="external">Threading Programming Guide</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Classes/NSRunLoop_Class/Reference/Reference.html#//apple_ref/doc/uid/TP40003725" target="_blank" rel="external">NSRunLoop Class Reference</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/CoreFoundation/Reference/CFRunLoopRef/Reference/reference.html#//apple_ref/doc/uid/20001441" target="_blank" rel="external">CFRunLoop Reference</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/CoreFoundation/Reference/CFRunLoopObserverRef/Reference/reference.html#//apple_ref/doc/uid/20001442" target="_blank" rel="external">CFRunLoopObserver Reference</a></li>
+<li><a href="http://www.dreamingwish.com/dream-2012/ios-multi-threaded-programming-guide-directory.html" target="_blank" rel="external">iOS多线程编程指南</a></li>
+<li><a href="http://objccn.io/issue-2/" target="_blank" rel="external">objccn.io #2 并发编程</a></li>
+</ul>
+<p><a href="https://github.com/daition340/NSThreadTest" target="_blank" rel="external">下载代码</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2013/12/22/2013-12-22-multi-threading-programming-of-ios-part-2/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2013/12/15/2013-12-15-working-with-custom-container-view-controllers/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

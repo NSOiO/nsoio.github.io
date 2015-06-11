@@ -1,0 +1,300 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>iOS多线程编程（2/4)：RunLoop | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="RunLoop是一种事件处理循环机制，类似于中断处理，它可以监听一个或多个定时器源(Timer Sources)和输入源（Input Sources），当没有事件时，它让线程休眠；当有事件发生时，系统唤醒线程，把事件放入RunLoop队列，RunLoop再分发给用户指定的事件处理入口函数。由此可以看">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="iOS多线程编程（2/4)：RunLoop"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">iOS多线程编程（2/4)：RunLoop</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2013-12-22</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <p>RunLoop是一种事件处理循环机制，类似于中断处理，它可以监听一个或多个定时器源(Timer Sources)和输入源（Input Sources），当没有事件时，它让线程休眠；当有事件发生时，系统唤醒线程，把事件放入RunLoop队列，RunLoop再分发给用户指定的事件处理入口函数。由此可以看出，RunLoop是为了<code>低功耗</code>而设计的，它不会浪费CPU的时间，不会阻止CPU进入低功耗模式，对于对功耗敏感的移动终端来说，在恰当的场合使用它能让你的程序获得更好的性能。</p>
+<h2 id="RunLoop">RunLoop</h2><p>我们可以通过Fondation框架中封装的<code>NSRunLoop</code>和CoreFoundation框架<code>CFRunLoop.h</code>中定义的相关方法来使用RunLoop，其中NSRunLoop是对CFRunLoop.h的OC封装，我们先从NSRunLoop开始学习怎么使用RunLoop以及其中的一些细节。</p>
+<p><img src="https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/Multithreading/Art/runloop.jpg" alt="imag"><br><!--break--><br><br><br>上图中是由runUtilDate:启动的RunLoop的结构，主要由以下特点：</p>
+<ul>
+<li><p>RunLoop是和线程紧密相连的，创建一个线程的同时系统就已经创建好了一个RunLoop。主线程的RunLoop是随着主线程自动启动的，其他子线程的RunLoop要手动启动。</p>
+</li>
+<li><p>RunLoop是在某一模式上运行的，可以使用</p>
+</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="built_in">BOOL</span>)runMode:(<span class="built_in">NSString</span> *)mode beforeDate:(<span class="built_in">NSDate</span> *)limitDate</span><br></pre></td></tr></table></figure>
+<p>来指定RunLoop运行在哪种模式上；事件源在被添加到RunLoop时，需要指定在何种模式下被触发，RunLoop观察者也要指定模式，用于指定观察何种模式下的RunLoop生命周期。</p>
+<ul>
+<li><p>RunLoop只处理两大类事件：Input Sources 和 Timer Sources,对Input sources中的三种<code>异步事件</code>：<code>基于端口的</code>、<code>自定义的</code>和<code>performSelector:onThread簇</code>。Timer Sources中的<code>同步事件</code>。需要注意的是<code>performSelector:withObject:afterDelay:</code>执行完会被移除RunLoop，而<code>performSelector:onThread:withObject:waitUntilDone:</code>在wait＝NO时，则不会，而wait＝YES时，会立即执行，不会添加到RunLoop中。</p>
+</li>
+<li><p>Timer Sources事件触发后，会被移出RunLoop队列，<code>本次RunLoop不会退出</code>；Input Sources事件被触发后，不会被移出RunLoop队列，<code>本次RunLoop结束</code>。如果RunLoop中只有一个Input Sources，如果不显式的移除，则永远存在；如果RunLoop中只有一个Timer Sources，如果Timer的repeat＝NO，或者Timer被终止，则RunLoop则会因没有事件源而立刻退出。</p>
+</li>
+<li><p>如果RunLoop中没有事件源，则立刻退出。</p>
+</li>
+</ul>
+<h2 id="RunLoop的处理事件时序">RunLoop的处理事件时序</h2><ul>
+<li>1) 进入Run Loop运行，此时会通知观察者进入Run Loop；      </li>
+<li>2) 如果有Timer即将触发时，通知观察者；    </li>
+<li>3) 如果有非Port的Input Sourc即将e触发时，通知观察者；</li>
+<li>4）触发非Port的Input Source事件源；</li>
+<li>5）如果基于Port的Input Source事件源即将触发时，立即处理该事件，跳转到步骤9；</li>
+<li>6）通知观察者当前线程将进入休眠状态；</li>
+<li>7）将线程进入休眠状态直到有以下事件发生：基于Port的Input Source被触发、Timer被触发、Run Loop运行时间到了过期时间、Run Loop被唤醒。</li>
+<li>8) 通知观察者线程将要被唤醒。</li>
+<li>9) 处理被触发的事件：<ul>
+<li>如果是用户自定义的Timer，处理Timer事件后重新启动Run Loop进入步骤2；</li>
+<li>如果是其他Input Source事件源有事件发生，直接处理这个事件；</li>
+<li>如果线程被唤醒又没有到过期时间，则进入步骤2；</li>
+</ul>
+</li>
+<li>10)到达此步骤说明Run Loop运行时间到期，或者是非Timer的Input Source事件被处理后，Run Loop将要退出，退出前通知观察者线程已退出。</li>
+</ul>
+<h2 id="RunLoop的运行模式mode">RunLoop的运行模式mode</h2><p>运行模式就是根据一个用字符串标记的名字来对RunLoop的事件处理做的区分，上图中的Input Sources和Timer Sources，以及后面要提到的RunLoop观察者都是绑定到指定的模式上(也可以选择绑定到所有模式上)，只有RunLoop在此模式上运行时，相应的事件才会被触发，相应的观察者才会收到消息。    </p>
+<p>iOS下RunLoop的运行模式主要有：  </p>
+<ul>
+<li><p><strong>NSDefaultRunLoopMode － kCFRunLoopDefaultMode</strong>    </p>
+<p>  线程的默认运行模式，大部分情况下都是运行在此种模式下的。上面两个分别对应Foundation和CF框架中的不同名字，如果打印出来：<code>NSLog(@&quot;%@&quot;,NSDefaultRunLoopMode)</code>，值就是kCFRunLoopDefaultMode。<br>系统有时会改变RunLoop的运行模式，也可以通过<code>- (BOOL)runMode:(NSString *)mode beforeDate:(NSDate *)limitDate</code>来指定运行模式。</p>
+</li>
+<li><p><strong>NSRunLoopCommonModes －  kCFRunLoopCommonModes</strong></p>
+<p>  NSRunLoopCommonModes代表一个modes集合，是为了方便事件源和RunLoop观察者绑定而设定的。添加到NSRunLoopCommonModes中的事件源或观察者就等于添加到了集合中所有的模式之上。通过<code>CFRunLoopAddCommonMode</code>可以向NSRunLoopCommonModes集合中添加自定义mode。注意，即使在代码中先把Timer添加到了modes集合中，又向集合中添加了新的modeA，如果线程运行于modeA，那么Timer事件一样会被触发，即与次序无关。</p>
+</li>
+<li><p><strong>UITrackingRunLoopMode:</strong>    </p>
+<p>  用于跟踪触摸事件触发的模式（例如UIScrollView上下滚动），主线程当触摸事件触发时会设置为这个模式，可以用来在控件事件触发过程中设置Timer。比如，在主线程中通过调用NSTimer的类方法：</p>
+</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">+ (<span class="built_in">NSTimer</span> *)scheduledTimerWithTimeInterval:(<span class="built_in">NSTimeInterval</span>)ti target:(<span class="keyword">id</span>)aTarget selector:(SEL)aSelector userInfo:(<span class="keyword">id</span>)userInfo repeats:(<span class="built_in">BOOL</span>)yesOrNo;</span><br></pre></td></tr></table></figure>
+<p>  会把一个Timer Source添加到当前RunLoop的<code>NSDefaultRunLoopMode</code>模式上，当触摸事件发生时，主线程被设置为<code>UITrackingRunLoopMode</code>模式，Timer 事件不会得到触发，可以通过调用</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)addTimer:(<span class="built_in">NSTimer</span> *)timer forMode:(<span class="built_in">NSString</span> *)mode;</span><br></pre></td></tr></table></figure>
+<p>将mode设置为NSRunLoopCommonModes来解决；如果想让Timer只在触摸屏幕的时候才被触发，可以将mode设置为UITrackingRunLoopMode。</p>
+<ul>
+<li><p><strong>GSEventReceiveRunLoopMode</strong>    </p>
+<p>用于接受系统事件，属于内部的Run Loop模式。</p>
+</li>
+<li><p><strong>Custom mdoe</strong></p>
+<p>  可以设置自定义模式，也可以通过</p>
+</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">CF_EXPORT</span> <span class="keyword">void</span> <span class="built_in">CFRunLoopAddCommonMode</span>(<span class="built_in">CFRunLoopRef</span> rl, <span class="built_in">CFStringRef</span> mode);</span><br></pre></td></tr></table></figure>
+<p>将Custom mode添加到kCFRunLoopCommonModes中去。</p>
+<h1 id="RunLoop的事件源">RunLoop的事件源</h1><p>事件源分为两大类，一是输入源（<code>Input Sources</code>），一是定时器源（<code>Timer Sources</code>）</p>
+<h2 id="1-输入源（Input_Sources）">1.输入源（Input Sources）</h2><p>输入源按按照事件来源的不同可分为<code>Port-Based Sources</code>、<code>Custom Input Sources</code>和<code>Cocoa Perform Selector Sources</code>。<br>输入源可以添加到多个RunLoop或多个运行模式上，这样这个输入源就能够得到即使的处理，比如通过网口接收到数据后想进行数据解析，解析方法就能得到最快的响应。官方文档描述如下：</p>
+<blockquote>
+<p>A run loop source can be registered in multiple run loops and run loop modes at the same time. When the source is signaled, whichever run loop that happens to detect the signal first will fire the source. Adding a source to multiple threads’ run loops can be used to manage a pool of “worker” threads that is processing discrete sets of data, such as client-server messages over a network or entries in a job queue filled by a “manager” thread. As messages arrive or jobs get added to the queue, the source gets signaled and a random thread receives and processes the request.</p>
+</blockquote>
+<ul>
+<li><h3 id="Port－Based_Sources">Port－Based Sources</h3><p>Foundation框架中，可以使用<code>NSPort</code>及其子类 : <code>NSMachPort</code>、<code>NSMessagePort</code>和<code>NSSocketPort</code> .NSMachPort可作为线程之间的通讯通道。例如在主线程创建子线程时传入一个NSPort对象，这样主线程就可以和这个子线程通讯啦，如果要实现双向通讯，那么子线程也需要回传给主线程一个NSPort。<br>CF框架中，相应的有<code>CFMachPortRef</code>、<code>CFMessagePortRef</code>和<code>CFSocketRef</code>,使用起来会比Foundation稍微复杂一点。    </p>
+<p>  Input Sources如果按照事件的触发过程可以分为<code>Version0</code>和<code>Version1</code>。他们对应于不同的上下文结构体：<code>CFRunLoopSourceContext</code>和<code>CFRunLoopSourceContext1</code>中的Version字段。   </p>
+<p>  Version0的输入源是受程序控制的，如果一个消息到达了输入源，你必须在程序中使用<code>CFRunLoopSourceSignal</code>来将这个输入源标记为<code>待触发</code>，然后再唤醒RunLoop。比如Socket Port就属于此类型。<br>Version1的输入源是受内核控制的，当有消息到达Mach Port时，系统会自动将这个输入源标记为<code>待触发</code>，并自动唤醒RunLoop。Mach Port和Message Port即属于此种类型。</p>
+</li>
+<li><h3 id="Custom_Input_Sources">Custom Input Sources</h3><p>只能使用CF框架中的API，可以创建上面所说的Version0 Version1两种类型的输入源。</p>
+</li>
+<li><h3 id="Cocoa_Perform_Selector_Sources">Cocoa Perform Selector Sources</h3><p>  相关的API簇如下如下所示：</p>
+</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//可以使用wait＝YES来进行阻塞执行</span></span><br><span class="line">performSelectorOnMainThread:withObject:waitUntilDone:</span><br><span class="line">performSelectorOnMainThread:withObject:waitUntilDone:modes:</span><br><span class="line"></span><br><span class="line"><span class="comment">//同样可以使用wait＝YES来进行阻塞执行，通过这种方式提交到run loop,</span></span><br><span class="line"><span class="comment">//在执行完之后不会被移除run loop，和官方文档矛盾？</span></span><br><span class="line">performSelector:onThread:withObject:waitUntilDone:</span><br><span class="line">performSelector:onThread:withObject:waitUntilDone:modes:</span><br><span class="line"></span><br><span class="line"><span class="comment">//通过这种方式提交到run loop中的selecto可以通过最后一组API取消</span></span><br><span class="line">performSelector:withObject:afterDelay:</span><br><span class="line">performSelector:withObject:afterDelay:inModes:</span><br><span class="line"></span><br><span class="line">cancelPreviousPerformRequestsWithTarget:</span><br><span class="line">cancelPreviousPerformRequestsWithTarget:selector:object:</span><br></pre></td></tr></table></figure>
+<p> <strong>它的特点如下：</strong></p>
+<blockquote>
+<ol>
+<li>可以运行在任意线程上</li>
+<li>和port－based sources类似，selector连续的添加到目标线程上</li>
+<li>和它不同到是，selecor执行完之后，就把自己从run loop中移除。（实际测试只有<code>performSelector:withObject:afterDelay:</code>才会被移除???）</li>
+<li>如果在一次run loop循环中有多个selector同时等待被触发，那么可以一次性触发所有这些selector。</li>
+</ol>
+</blockquote>
+<h2 id="2-Tiemr_Sources">2.Tiemr Sources</h2><p>定时器事件作为Timer Sources添加到RunLoop中。如果一个搜索控件想在用户输入完成等待一段事件后自动开始一次搜索，就可以使用定时器来完成。  </p>
+<p>定时器源也是要在RunLoop运行在其指定的模式上才能被触发，并且可以指定被触发一次还是可以被重复触发，作为主线程的定时器如果不想被主线程延迟，应该添加到NSRunLoopCommonModes上。比如一个5s重复一次的定时器被延迟了，在下一次RunLoop中被触发之后，还是继续以5s重复一次的频率运行。<br><strong>再次需要注意的是：</strong>定时器被触发之后，会被移除RunLoop，不会中断当前RunLoop，即使使用</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">SInt32 <span class="built_in">CFRunLoopRunInMode</span> (</span><br><span class="line">   <span class="built_in">CFStringRef</span> mode,</span><br><span class="line">   <span class="built_in">CFTimeInterval</span> seconds,</span><br><span class="line">   Boolean returnAfterSourceHandled</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p>并且returnAfterSourceHandled＝YES，也不会使这个函数返回。</p>
+<h2 id="NSRunLoop_接口">NSRunLoop <a href="https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Classes/NSRunLoop_Class/Reference/Reference.html#//apple_ref/doc/uid/20000321-DontLinkElementID_1" target="_blank" rel="external">接口</a></h2><figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//Accessing Run Loops and Modes</span></span><br><span class="line">+ currentRunLoop</span><br><span class="line">– currentMode</span><br><span class="line">– limitDateForMode:</span><br><span class="line">+ mainRunLoop</span><br><span class="line">– get<span class="built_in">CFRunLoop</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Managing Timers</span></span><br><span class="line">– addTimer:forMode:</span><br><span class="line"></span><br><span class="line"><span class="comment">//Managing Ports</span></span><br><span class="line">– addPort:forMode:</span><br><span class="line">– removePort:forMode:</span><br><span class="line"></span><br><span class="line"><span class="comment">//Running a Loop</span></span><br><span class="line"><span class="comment">/*</span><br><span class="line">@brief: 如果有事件源则以默认模式重复调用– runMode:beforeDate: ，函数不返回；</span><br><span class="line">            如果没有事件源返回。</span><br><span class="line">*/</span></span><br><span class="line">– run</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span><br><span class="line">@brief:以指定模式运行完一次，或超时，即退出本次run loop，函数返回。</span><br><span class="line">@parameter：mode 运行模式 data：超时时间</span><br><span class="line">@return YES 如果run loop能够启动，在处理完一次输入源，超时时间到</span><br><span class="line">               NO 如果run loop没能够启动，如没有事件源或mode参数“非法”</span><br><span class="line">*/</span></span><br><span class="line">– runMode:beforeDate:</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span><br><span class="line">@brief: 如果有事件源则以默认模式重复调用– runMode:beforeDate: ，直至超时，函数返回</span><br><span class="line">            如果没有事件源则返回</span><br><span class="line">*/</span></span><br><span class="line">– runUntilDate:</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span><br><span class="line">@brief:功能和– runMode:beforeDate:差不多，区别也大：</span><br><span class="line">            1.不能触发Timer，因为Timer不是Input Sources</span><br><span class="line">            2.没有返回值</span><br><span class="line">*/</span></span><br><span class="line">– acceptInputForMode:beforeDate:</span><br><span class="line"></span><br><span class="line"><span class="comment">//Scheduling and Canceling Messages</span></span><br><span class="line">– performSelector:target:argument:order:modes:</span><br><span class="line">– cancelPerformSelector:target:argument:</span><br><span class="line">– cancelPerformSelectorsWithTarget:</span><br></pre></td></tr></table></figure>
+<h2 id="CFRunLoop_接口">CFRunLoop <a href="https://developer.apple.com/library/ios/documentation/CoreFoundation/Reference/CFRunLoopRef/Reference/reference.html#//apple_ref/doc/uid/20001441-Reference-DontLinkElementID_1" target="_blank" rel="external">接口</a></h2><figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//Getting a Run Loop</span></span><br><span class="line"><span class="built_in">CFRunLoopGetCurrent</span></span><br><span class="line"><span class="built_in">CFRunLoopGetMain</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Starting and Stopping a Run Loop</span></span><br><span class="line"><span class="built_in">CFRunLoopRun</span></span><br><span class="line"><span class="built_in">CFRunLoopRunInMode</span></span><br><span class="line"><span class="built_in">CFRunLoopWakeUp</span></span><br><span class="line"><span class="built_in">CFRunLoopStop</span></span><br><span class="line"><span class="built_in">CFRunLoopIsWaiting</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Managing Sources</span></span><br><span class="line"><span class="built_in">CFRunLoopAddSource</span></span><br><span class="line"><span class="built_in">CFRunLoopContainsSource</span></span><br><span class="line"><span class="built_in">CFRunLoopRemoveSource</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Managing Observers</span></span><br><span class="line"><span class="built_in">CFRunLoopAddObserver</span></span><br><span class="line"><span class="built_in">CFRunLoopContainsObserver</span></span><br><span class="line"><span class="built_in">CFRunLoopRemoveObserver</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Managing Run Loop Modes</span></span><br><span class="line"><span class="built_in">CFRunLoopAddCommonMode</span></span><br><span class="line"><span class="built_in">CFRunLoopCopyAllModes</span></span><br><span class="line"><span class="built_in">CFRunLoopCopyCurrentMode</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Managing Timers</span></span><br><span class="line"><span class="built_in">CFRunLoopAddTimer</span></span><br><span class="line"><span class="built_in">CFRunLoopGetNextTimerFireDate</span></span><br><span class="line"><span class="built_in">CFRunLoopRemoveTimer</span></span><br><span class="line"><span class="built_in">CFRunLoopContainsTimer</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Scheduling Blocks</span></span><br><span class="line"><span class="built_in">CFRunLoopPerformBlock</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//Getting the CFRunLoop Type ID</span></span><br><span class="line"><span class="built_in">CFRunLoopGetTypeID</span></span><br></pre></td></tr></table></figure>
+<h2 id="什么时候使用RunLoop">什么时候使用RunLoop</h2><p><strong>官方文档的建议是：</strong>  </p>
+<ul>
+<li>需要使用Port或者自定义Input Source与其他线程进行通讯。    </li>
+<li>需要在线程中使用Timer。</li>
+<li>需要在线程上使用performSelector<strong>*</strong>方法。</li>
+<li>需要让线程执行周期性的工作。</li>
+</ul>
+<p><strong><a href="http://www.hrchen.com/2013/06/multi-threading-programming-of-ios-part-1/" target="_blank" rel="external">hrchen</a>提到以下应用场景：</strong></p>
+<ul>
+<li>使用自定义Input Source和其他线程通信</li>
+<li>子线程中使用了定时器</li>
+<li>使用任何performSelector<strong>*</strong>到子线程中运行方法</li>
+<li><p>使用子线程去执行周期性任务<br>NSURLConnection在子线程中发起异步请求</p>
+<h2 id="参考资料">参考资料</h2></li>
+<li><p><a href="http://www.hrchen.com/2013/06/multi-threading-programming-of-ios-part-1/" target="_blank" rel="external">iOS多线程编程Part 1/3 - NSThread &amp; Run Loop</a></p>
+</li>
+<li><a href="https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/Multithreading/Introduction/Introduction.html#//apple_ref/doc/uid/10000057i-CH1-SW1" target="_blank" rel="external">Threading Programming Guide</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Classes/NSRunLoop_Class/Reference/Reference.html#//apple_ref/doc/uid/TP40003725" target="_blank" rel="external">NSRunLoop Class Reference</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/CoreFoundation/Reference/CFRunLoopRef/Reference/reference.html#//apple_ref/doc/uid/20001441" target="_blank" rel="external">CFRunLoop Reference</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/CoreFoundation/Reference/CFRunLoopObserverRef/Reference/reference.html#//apple_ref/doc/uid/20001442" target="_blank" rel="external">CFRunLoopObserver Reference</a></li>
+<li><a href="https://developer.apple.com/library/ios/documentation/CoreFoundation/Reference/CFRunLoopSourceRef/Reference/reference.html#//apple_ref/doc/uid/20001443" target="_blank" rel="external">CFRunLoopSource Reference</a></li>
+<li><a href="http://www.dreamingwish.com/dream-2012/ios-multi-threaded-programming-guide-directory.html" target="_blank" rel="external">iOS多线程编程指南</a></li>
+<li><a href="http://objccn.io/issue-2/" target="_blank" rel="external">objccn.io #2 并发编程</a></li>
+</ul>
+<h2 id="Sample_Code">Sample Code</h2><p>我在github上fork了一一份hrchen的代码。<br><a href="https://github.com/daition340/ExamplesForBlog" target="_blank" rel="external">代码下载</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2014/01/01/2014-01-01-multi-threading-programming-of-ios-part-3/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2013/12/18/2013-12-18-multi-threading-programming-of-ios-part-1/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

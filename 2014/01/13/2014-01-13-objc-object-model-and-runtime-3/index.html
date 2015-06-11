@@ -1,0 +1,224 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>OC对象模型及运行时(3/3)－应用 | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="在part2中，我们知道由三种途径可以和运行时打交道，使用最灵活的要数最后一种了，通过#import&amp;lt;objc/runtime.h&amp;gt;，我们就可以使用强大的运行时提供的全部功能了。不过，运行时是一把双刃剑，它能影响到你的所有代码的运行，所以除非很必要，一般最好还是尽少使用吧。
+method">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="OC对象模型及运行时(3/3)－应用"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">OC对象模型及运行时(3/3)－应用</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2014-01-13</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <p>在part2中，我们知道由三种途径可以和运行时打交道，使用最灵活的要数最后一种了，通过<code>#import&lt;objc/runtime.h&gt;</code>，我们就可以使用强大的运行时提供的全部功能了。不过，运行时是一把双刃剑，它能影响到你的所有代码的运行，所以除非很必要，一般最好还是尽少使用吧。</p>
+<h2 id="method_swizzling">method swizzling</h2><p>这次主要说一下<code>method swizzling</code>的用法，它通过添加/修改/删除<code>SEL -&gt; IMP</code>的映射关系，来让运行时去执行指定的方法；这种方法在某些场景下非常有效，当我们有需要在类目中重载一个类的方法的需求时就可以使用<code>method swizzling</code>,因为在类目中重载方法会导致原有的方法永远没有机会去执行了，而且原有的方法的具体实现我们是无法知道的，这就可能会导致不可预测的危险，所以最好的是使用<code>methor swizzling</code></p>
+<p>下面通过一个我在实际中用到的一个例子还说明一下具体的使用方法。</p>
+<p>在iOS7中，<code>UINavigationController</code>新增加了一个支持手势返回的API:</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">@property</span>(<span class="keyword">nonatomic</span>, <span class="keyword">readonly</span>) <span class="built_in">UIGestureRecognizer</span> *interactivePopGestureRecognizer <span class="built_in">NS_AVAILABLE_IOS</span>(<span class="number">7</span>_0);</span><br></pre></td></tr></table></figure>
+<p>实际上它是<code>UIScreenEdgePanGestureRecognizer</code>类型的，但只支持从左边侧开始的手势，如果我们想要实现从任意位置开始的返回，最简单的方法就是使用 <code>method Swizzling</code> 来实现，这个灵感来自于<a href="http://stackoverflow.com/questions/20714595/extend-default-interactivepopgesturerecognizer-beyond-screen-edge" target="_blank" rel="external">这里</a>和<a href="https://github.com/fastred/SloppySwiper/issues/1" target="_blank" rel="external">这里</a>.<br><!--break--></p>
+<ul>
+<li>首先先实现一个用于<code>method swizzling</code>的C函数：</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">void</span> MethodSwizzle(Class c, SEL origSEL, SEL overrideSEL)&#123;</span><br><span class="line">    </span><br><span class="line">    Method origMethod = class_getInstanceMethod(c, origSEL);</span><br><span class="line">    Method overrideMethod = class_getInstanceMethod(c, overrideSEL);</span><br><span class="line">    </span><br><span class="line">    method_exchangeImplementations(origMethod, overrideMethod);</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>然后实现一个<code>UIScreenEdgePanGestureRecognizer</code>的类目,我们只需要将<code>UIScreenEdgePanGestureRecognizer</code>替换成<code>UIPanGestureRecognizer</code>即可。</li>
+</ul>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">+ (<span class="keyword">void</span>)load&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> <span class="built_in">dispatch_once_t</span> onceToken;</span><br><span class="line">    <span class="built_in">dispatch_once</span>(&amp;onceToken, ^&#123;</span><br><span class="line">        MethodSwizzle([<span class="keyword">self</span> class], <span class="keyword">@selector</span>(initWithTarget:action:), <span class="keyword">@selector</span>(initPanWithTarget:action:));</span><br><span class="line">    &#125;);</span><br><span class="line">    </span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">- (<span class="keyword">id</span>)initPanWithTarget:(<span class="keyword">id</span>)target action:(SEL)action&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (enableGesturePop) &#123;</span><br><span class="line">        enableGesturePop = <span class="literal">NO</span>;</span><br><span class="line">        <span class="keyword">self</span> = (<span class="built_in">UIScreenEdgePanGestureRecognizer</span> *)[[<span class="built_in">UIPanGestureRecognizer</span> alloc] initWithTarget:target action:action];</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">self</span> = [<span class="keyword">self</span> initPanWithTarget:target action:action];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>需要注意的是我们在程序中似乎是使用了递归调用，其实不然，因为我们之前在<code>+load()</code>中已经交换了这两个方法的<code>SEL -&gt; IMP</code>映射。</p>
+<p>我们可以通过<code>enableGesturePop</code>来决定是使用自定义的返回功能还是使用系统提供的返回功能。</p>
+<p>最后的效果如下图所示：<br></p>
+<p><img src="/images/video/pop_ios7.gif" alt="image"></p>
+<p>关于运行时的其他用法，比如通过<code>category</code>给类添加属性和变量。因为类的结构体确定好之后，大小就不能改变了，这种方法其实是通过<code>Associated Objects</code>来进行添加的；其他的应有还有IMP缓存、Dynamic NSCoding，想深入学习的话可以参考一下参考资料中的内容。</p>
+<h2 id="参考资料">参考资料</h2><ol>
+<li><p><a href="https://developer.apple.com/library/ios/documentation/Cocoa/Reference/ObjCRuntimeRef/Reference/reference.html#//apple_ref/doc/uid/TP40001418" target="_blank" rel="external">Objective-C Runtime Reference</a></p>
+</li>
+<li><p><a href="http://www.cnblogs.com/wupher/archive/2013/01/05/2845338.html" target="_blank" rel="external">让Category支持添加属性与成员变量</a></p>
+</li>
+<li><p><a href="http://nshipster.com/associated-objects/" target="_blank" rel="external">Associated Objects</a></p>
+</li>
+<li><p><a href="http://nshipster.cn/associated-objects/" target="_blank" rel="external">Associated Objects-翻译版</a></p>
+</li>
+<li><p><a href="http://nshipster.com/method-swizzling/" target="_blank" rel="external">Method Swizzling</a></p>
+</li>
+<li><p><a href="http://blog.devtang.com/blog/2013/10/15/objective-c-object-model/" target="_blank" rel="external">Objective-C对象模型及应用</a></p>
+</li>
+<li><p><a href="http://onevcat.com/2012/04/objective-c-runtime/" target="_blank" rel="external">深入Objective-C的动态特性</a></p>
+</li>
+<li><p><a href="http://www.g8production.com/post/74496592834/dynamic-nscoding-with-objective-c-runtime-and" target="_blank" rel="external">Dynatic NSCoding</a></p>
+</li>
+<li><p><a href="http://blog.csdn.net/zhchaoo/article/details/8727104" target="_blank" rel="external">Delegate的IMP缓存</a></p>
+</li>
+<li><p><a href="https://www.mikeash.com/pyblog/friday-qa-2010-01-29-method-replacement-for-fun-and-profit.html" target="_blank" rel="external">Method Replacement for Fun and Profit</a></p>
+</li>
+</ol>
+<h2 id="Updata">Updata</h2><p>Github上发现了一个从任意位置滑动手势返回的完整实现：<a href="https://github.com/fastred/SloppySwiper" target="_blank" rel="external">SloppySwipe</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2014/02/04/2014-02-04-shi-yong-coregraphicshui-zhi-zhong-jian-lou-kong-de-2dtu-xing-de-5chong-fang-fa/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2014/01/11/2014-01-11-objc-object-model-and-runtime-2/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

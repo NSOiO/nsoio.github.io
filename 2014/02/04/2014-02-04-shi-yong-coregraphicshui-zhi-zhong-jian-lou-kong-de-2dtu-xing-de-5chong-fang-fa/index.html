@@ -1,0 +1,238 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>[译]绘制中间镂空的图形的方法 | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="在这篇文章中，我研究了5种不同的方法去绘制这样一种简单的形状：一个正方形，中间是一个三角形。在一个绘图环境，比如CoreGraphics中，提供了double buffering, winding count path filling, even-odd path filling 和 clippin">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="[译]绘制中间镂空的图形的方法"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">[译]绘制中间镂空的图形的方法</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2014-02-04</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <p>在这篇文章中，我研究了5种不同的方法去绘制这样一种简单的形状：一个正方形，中间是一个三角形。在一个绘图环境，比如CoreGraphics中，提供了<code>double buffering</code>, <code>winding count path filling</code>, <code>even-odd path filling</code> 和 <code>clipping regions</code>等不止一种方法。最后还将提供一个iPhone的示例工程，里面的绘图代码同样适用于Mac。</p>
+<h2 id="介绍">介绍</h2><p>这篇文章将要研究绘制下面这个图形的不同方法：</p>
+<p><img src="/images/coregraphics/shape1.png" alt="image"></p>
+<p>这是个简单的形状，但是需要一个不简单的拓扑：为了绘制它，你需要在图形外面裁剪出中心。这篇文章将要研究5种不同的实现方法，并分析各自的优缺点。</p>
+<p>为了更好的说明，我把绘制过程种需要用到的点的坐标都起了如下的名字：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// Coordinates are:</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// A-------------B     A(0,0), B(100,0), C(100,100), D(0,100)</span></span><br><span class="line"><span class="comment">// |      E      |     E(50,10), F(10,90), G(90,90)</span></span><br><span class="line"><span class="comment">// |     / \     |     H(50,90), I(50,100)</span></span><br><span class="line"><span class="comment">// |    /   \    |</span></span><br><span class="line"><span class="comment">// |   /     \   |</span></span><br><span class="line"><span class="comment">// |  F---H---G  |</span></span><br><span class="line"><span class="comment">// D------I------C</span></span><br></pre></td></tr></table></figure>
+<!--break-->
+<h3 id="方法一_overpainting">方法一 overpainting</h3><p>最无脑的绘制过程是先使用图形的颜色绘制出一个正方形(ABCD)，然后在此之上用背景的颜色绘制出一个三角形(EGF)。</p>
+<p>虽然很清楚，但是这样的代码是不被建议使用的。</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// Technique 1: overpaint</span></span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Bx, By);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Cx, Cy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Dx, Dy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextSetRGBFillColor</span>(context, <span class="number">0.5</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>);</span><br><span class="line"><span class="built_in">CGContextFillPath</span>(context);</span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ex, Ey);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Fx, Fy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Gx, Gy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ex, Ey);</span><br><span class="line"><span class="built_in">CGContextSetRGBFillColor</span>(context, <span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>);</span><br><span class="line"><span class="built_in">CGContextFillPath</span>(context);</span><br></pre></td></tr></table></figure>
+<p>Advantages: if you’re only familiar with the “painter’s algorithm” (everything is just painted over the top of everything else) then this might be the easiest concept to understand.</p>
+<p>Disadvantages: if your background changes, the effect won’t work.</p>
+<h4 id="优点:">优点:</h4><pre><code>如果你仅仅熟悉<span class="escape">`p</span>ainter algorithm<span class="escape">`，</span>认为所有的绘制过程都是一层一层绘制上去的，那么这或许是你能够理解的最简单的方式。
+</code></pre><h4 id="缺点:">缺点:</h4><pre><code>如果背景颜色改变了，将不会对镂空部分起作用。
+</code></pre><p><img src="/images/coregraphics/shape1problem.png" alt="image"></p>
+<p>这种绘制过程还有个问题就是图像中三角形的像素部分会在’offscreen buffer’中绘制两次（第一次使用正方形的颜色，第二次使用背景颜色）。如果你用这种方法去绘制一个很大的图形，这将会比只绘制一次慢很多。</p>
+<h2 id="方法二_false_hole">方法二 false hole</h2><p>绘制这个图形的另一个欺骗的方法是将其看作一个单一的拓扑，沿着H－I这条线裁剪，像绘制马蹄铁一样去绘制这个图形（ABCI 然后 HGEFH 最后以 IDA 结束）。</p>
+<p>再一次，下面的代码还是不建议使用。</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// Technique 2: false hole</span></span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Bx, By);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Cx, Cy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ix, Iy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Hx, Hy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Gx, Gy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ex, Ey);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Fx, Fy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Hx, Hy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ix, Iy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Dx, Dy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextSetRGBFillColor</span>(context, <span class="number">0</span>, <span class="number">0.5</span>, <span class="number">0</span>, <span class="number">1</span>);</span><br><span class="line"><span class="built_in">CGContextFillPath</span>(context);</span><br></pre></td></tr></table></figure>
+<h4 id="优点:-1">优点:</h4><pre><code>避免了方法一中，背景颜色改变而导致的颜色不一致的问题
+</code></pre><h4 id="优点:-2">优点:</h4><pre><code>绘制不太准确，因为会多出一条边界出来。
+</code></pre><p><img src="/images/coregraphics/shape2problem.png" alt="image"></p>
+<p>这个过程会有精确性的问题：如果底部的两次裁剪不能重合，在高分辨率下会显示一条缝隙（比如在Mac下一旦分辨率依赖于用户的设置，对象的绘制就会导致不期望的尺寸）</p>
+<h2 id="方法三_Winding_count">方法三 Winding count</h2><p>这是在绘制镂空的图形中第一种正确的方法，使用<code>Winding Count</code>多边形内部运算法则来确定内部的三角形是在绘制路径的外面。</p>
+<p><code>Winding Count</code>是<code>CoreGraphics</code>用来确定一个像素是在绘制路径内还是在绘制路径外的默认方法，它的工作过程如下：</p>
+<ol>
+<li>CoreGraphics draws every horizontal row within the path’s bounding rectangle from left-to-right</li>
+<li>At the start of each row, CoreGraphics sets the winding count for the shape to zero.</li>
+<li>If CoreGraphics crosses a line in the shape at any point during the row, it notes if the line was going upwards or downwards at the point where CoreGraphics crossed it.</li>
+<li>An upward line increases the winding count of the shape by 1.</li>
+<li>A downward line decreases the winding count of the shape by 1.</li>
+<li>If the winding count for the shape is ever non-zero (positive or negative) then pixels are filled according to the color of the shape.</li>
+</ol>
+<p>如果上面的不好理解的话，下面的是简单的描述：</p>
+<h4 id="简单的winding_count：">简单的<code>winding count</code>：</h4><pre><code>如果路径是顺时针的，则内部的逆时针路径将不会被绘制；如果路径是逆时针的，则内部的顺时针路径将不会被绘制。
+</code></pre><p>使用<code>Windging Count</code>绘制图形的代码如下：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// Technique 3: winding count fill rule</span></span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Bx, By);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Cx, Cy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Dx, Dy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextClosePath</span>(context);</span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ex, Ey);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Fx, Fy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Gx, Gy);</span><br><span class="line"><span class="built_in">CGContextClosePath</span>(context);</span><br><span class="line"><span class="built_in">CGContextSetRGBFillColor</span>(context, <span class="number">0.5</span>, <span class="number">0.0</span>, <span class="number">0.75</span>, <span class="number">1</span>);</span><br><span class="line"><span class="built_in">CGContextFillPath</span>(context);</span><br></pre></td></tr></table></figure>
+<p>子路径 ABCD 是顺时针的，所以逆时针的 EFG 就创建了一个洞。为了开始内部的子路径，我们需要关闭第一条子路径，并把当前点移到下一条子路径的起始位置（所有的子路径都是当前路径的一部分）</p>
+<h4 id="优点:-3">优点:</h4><pre><code>确实是绘制了一个裁剪了一个洞的图形。
+</code></pre><h4 id="缺点:-1">缺点:</h4><pre><code>使用时必须需要小心一点，如果不小心将内部的子路径顺序改为 EGF ，它将不会工作（顺时针加上顺时针导致winding <span class="command">count</span>等于<span class="number">2</span>，非零会被填充）
+</code></pre><p><code>Winding counts</code> 需要一点额外的注意力去保证方向一直要保持一致。</p>
+<h2 id="方法四_Even-odd_paths">方法四 Even-odd paths</h2><p><code>Even-odd</code>是用于<code>CoreGraphins</code>的另一套规则，相比较<code>winding count</code>它更简单一点：在<code>even-odd</code>中，最外层的边界开启一个填充路径，次外层的边界会关闭这个路径，其他的嵌套边界也是一样。</p>
+<p>实现代码和<code>winding count</code>版本很类似，区别就在于我们要用<code>CGContextEOFillPath</code>来填充路径，而且不必考虑<code>ABCD</code>和<code>EFG</code>的次序问题。</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// Technique 4: even-odd fill rule</span></span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Bx, By);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Cx, Cy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Dx, Dy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextClosePath</span>(context);</span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ex, Ey);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Fx, Fy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Gx, Gy);</span><br><span class="line"><span class="built_in">CGContextClosePath</span>(context);</span><br><span class="line"><span class="built_in">CGContextSetRGBFillColor</span>(context, <span class="number">0.75</span>, <span class="number">0.5</span>, <span class="number">0</span>, <span class="number">1</span>);</span><br><span class="line"><span class="built_in">CGContextEOFillPath</span>(context);</span><br></pre></td></tr></table></figure>
+<h4 id="优点:-4">优点:</h4><pre><code>和<span class="escape">`w</span>inding count<span class="escape">`相</span>比，避免了次序出错的可能性。
+</code></pre><h4 id="缺点:-2">缺点:</h4><pre><code>有些情况下，<span class="escape">`w</span>idning count<span class="escape">`会</span>给出更好的结果。看一下下面由单条连续路径<span class="number">12345</span>绘制而成的五角星
+</code></pre><p><img src="/images/coregraphics/eoversuswinding.png" alt="image"></p>
+<p>在这种情况下，如果你确实想填充中间部分，你就得使用<code>winding count</code>(图形是由连续的顺时钟方向路径所绘制的，所以<code>winding count</code>一直都是正的)</p>
+<h2 id="方法五：Clipping_region">方法五：Clipping region</h2><p>最后一个方法是使用<code>clipping region</code>来使能绘制区域，进而去掉中间的三角形。</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// Technique 5: remove the inner hole using a clipping region</span></span><br><span class="line"><span class="built_in">CGContextSaveGState</span>(context);</span><br><span class="line"><span class="built_in">CGContextAddRect</span>(context, <span class="built_in">CGContextGetClipBoundingBox</span>(context));</span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ex, Ey);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Fx, Fy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Gx, Gy);</span><br><span class="line"><span class="built_in">CGContextClosePath</span>(context);</span><br><span class="line"><span class="built_in">CGContextEOClip</span>(context);</span><br><span class="line"><span class="built_in">CGContextMoveToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Bx, By);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Cx, Cy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Dx, Dy);</span><br><span class="line"><span class="built_in">CGContextAddLineToPoint</span>(context, Ax, Ay);</span><br><span class="line"><span class="built_in">CGContextSetRGBFillColor</span>(context, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0.5</span>, <span class="number">1</span>);</span><br><span class="line"><span class="built_in">CGContextFillPath</span>(context);</span><br><span class="line"><span class="built_in">CGContextRestoreGState</span>(context);</span><br></pre></td></tr></table></figure>
+<p>可以看到，这个方法确实相当复杂，因为要绘制的图形上有镂空，所以<code>clipping region</code>也要做相同的事情。我是用<code>even－odd</code>规则在<code>clipping region</code>的矩形边界减去三角形。</p>
+<h4 id="优点:-5">优点:</h4><pre><code>一个裁剪区域能够非常简单的减去或切除掉非常复杂的图形簇
+</code></pre><h4 id="缺点：">缺点：</h4><pre><code>像上面这样如果要切除一个简单的图形，需要做些额外的事情：保存/恢复旧的状态，再加上裁剪区域仅仅和图形本身一样负责，使得这个方法比前两个需要做更多的事情。
+</code></pre><h2 id="总结">总结</h2><p>可以直接下载代码<a href="http://projectswithlove.com/projects/GraphicalSubtraction.zip" target="_blank" rel="external">GraphicalSubtraction.zip(25kb)</a>,或者直接从<a href="https://github.com/daition340/GraphicalSubtraction" target="_blank" rel="external">github</a>上下载</p>
+<p>一个非常简单的图形，但是你可以用很多不同的方法。就像你所看到的，解决这个问题的错误的方法确实不能节省代码量 － 和正确的解决方法差不多</p>
+<p>解决这个问题最好的方法是使用<code>even－odd</code>或者<code>winding count</code>。因为图形看起来像是中心被裁剪掉，<code>clipping region</code>被证明是需要更多的工作，而且非矩形的裁剪确实不大好计算。</p>
+<p><a href="http://www.cocoawithlove.com/2010/05/5-ways-to-draw-2d-shape-with-hole-in.html" target="_blank" rel="external">原文地址</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2014/02/07/2014-02-07-some-concepts-of-quartz2d/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2014/01/13/2014-01-13-objc-object-model-and-runtime-3/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

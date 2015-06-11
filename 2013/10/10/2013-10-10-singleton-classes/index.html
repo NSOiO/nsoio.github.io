@@ -1,0 +1,196 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>[译] Objective-C中的单例 | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="单例模式是我在iOS开发中使用的最多的设计模式之一。它是一种不需要你去手动传递，而能在代码的不同部分之间分享数据的一种极其强大的方式。关于单例模式和其他设计模式的更多详情，可参考这一本不错的书:
+ 
+背景单例类是一个需要重点去理解的概念，因为它展示了一种非常有用的设计模式。这种设计思想被广泛应用在了">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="[译] Objective-C中的单例"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">[译] Objective-C中的单例</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2013-10-10</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <p><a href="http://en.wikipedia.org/wiki/Singleton_pattern" target="_blank" rel="external">单例模式</a>是我在iOS开发中使用的最多的设计模式之一。它是一种不需要你去手动传递，而能在<br>代码的不同部分之间分享数据的一种极其强大的方式。关于单例模式和其他设计模式的更多<br>详情，可参考这一本不错的书:</p>
+<p><a href="http://www.amazon.co.uk/dp/0321535022?tag=matgalsiphapp-21&amp;camp=1406&amp;creative=6394&amp;linkCode=as1&amp;creativeASIN=0321535022&amp;adid=173ESG4Y7N1JDW4CNQQ1&amp;&amp;ref-refURL = http%3A%2F%2Fwww.galloway.me.uk%2Ftutorials%2Fsingleton-classes%2F" target="_blank" rel="external"><img src="/images/cocoa_design_pattern.jpg" alt=""></a> </p>
+<h2 id="背景">背景</h2><p>单例类是一个需要重点去理解的概念，因为它展示了一种非常有用的设计模式。这种设计思想被广泛应用在了iPhone SDK当中，例如：在代码的任何地方给<code>UIApplication</code>发一个叫做<code>sharedApplication</code>的消息都会返回同一个和当前正在运行的程序相关的<code>UIApplicition</code>实例。</p>
+<h2 id="怎么实现">怎么实现</h2><p>可以在Objctive－C中使用如下代码来实现一个单例类:</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="preprocessor">#import <span class="title">&lt;foundation/Foundation.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">MyManager</span> : <span class="title">NSObject</span> </span>&#123;</span><br><span class="line">    <span class="built_in">NSString</span> *someProperty;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">@property</span> (<span class="keyword">nonatomic</span>, retain) <span class="built_in">NSString</span> *someProperty;</span><br><span class="line"></span><br><span class="line">+ (<span class="keyword">id</span>)sharedManager;</span><br><span class="line"></span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="preprocessor">#import <span class="title">"MyManager.h"</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">MyManager</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">@synthesize</span> someProperty;</span><br><span class="line"></span><br><span class="line"><span class="preprocessor">#pragma mark Singleton Methods</span></span><br><span class="line"></span><br><span class="line">+ (<span class="keyword">id</span>)sharedManager &#123;</span><br><span class="line">    <span class="keyword">static</span> MyManager *sharedMyManager ＝ <span class="literal">nil</span>;                                                                                                                                                        </span><br><span class="line">    <span class="keyword">static</span> <span class="built_in">dispatch_once_t</span> onceToken;</span><br><span class="line">    <span class="built_in">dispatch_once</span>(&amp;onceToken, ^&#123;</span><br><span class="line">        sharedMyManager = [[<span class="keyword">self</span> alloc] init];                                                                                                                                                                                </span><br><span class="line">    &#125;);</span><br><span class="line">    <span class="keyword">return</span> sharedMyManager;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">- (<span class="keyword">id</span>)init &#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">self</span>     = [<span class="keyword">super</span> init]) &#123;</span><br><span class="line">    someProperty = [[<span class="built_in">NSString</span> alloc] initWithString:<span class="string">@"Default Property Value"</span>];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)dealloc &#123;</span><br><span class="line"><span class="comment">// Should never be called, but just here for clarity really.</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+<p>上面的代码所做的是在<code>sharedManager</code>方法中定义一个名为<code>sharedMyManager</code>的静态局部变量（仅仅在这一个<a href="translation unit">translation unit</a>中是全局的），这个静态局部变量仅仅初始化一次。为了确保它只被建立一次，我们使用了<a href="http://developer.apple.com/library/ios/#documentation/Performance/Reference/GCD_libdispatch_Ref/Reference/reference.html" target="_blank" rel="external">Grand Central Dispatch(GCD)</a>中的<a href="https://developer.apple.com/library/ios/documentation/Performance/Reference/GCD_libdispatch_Ref/Reference/reference.html#//apple_ref/c/func/dispatch_once" target="_blank" rel="external"><code>dispath_once</code></a>.GCD是完全由操作系统控制的，并且是线程安全的，所以你可以毫无顾虑的去使用它.如果不愿使用GCD，可以使用以下代码来替换<code>sharedManager</code>：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">+ (<span class="keyword">id</span>)sharedManager &#123;</span><br><span class="line">    <span class="keyword">static</span> MyManager *sharedMyManager = <span class="literal">nil</span>;</span><br><span class="line">    <span class="keyword">@synchronized</span>(<span class="keyword">self</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (sharedMyManager == <span class="literal">nil</span>)</span><br><span class="line">        sharedMyManager = [[<span class="keyword">self</span> alloc] init];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sharedMyManager;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后，你就可以在工程的任意地方通过调用如下的函数来饮用一个单例类：</p>
+<p><code>MyManager *sharedManager = [MyManager sharedManager]</code>;我已经在代码中大量使用了这样的方式，比如：创建一个单例类去控制CoreLocation或者CoreData函数</p>
+<h2 id="Non-ARC_code">Non-ARC code</h2><p>不推荐使用。但是如果你没有使用<a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html" target="_blank" rel="external">Automatic Reference Counting(ARC)</a>的话，只能使用以下代码：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="preprocessor">#import <span class="title">"MyManager.h"</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> MyManager *sharedMyManager = <span class="literal">nil</span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">MyManager</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">@synthesize</span> someProperty;</span><br><span class="line"></span><br><span class="line"><span class="preprocessor">#pragma mark Singleton Methods</span></span><br><span class="line">+ (<span class="keyword">id</span>)sharedManager &#123;</span><br><span class="line">    <span class="keyword">@synchronized</span>(<span class="keyword">self</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span>(sharedMyManager == <span class="literal">nil</span>)</span><br><span class="line">        sharedMyManager = [[<span class="keyword">super</span> allocWithZone:<span class="literal">NULL</span>] init];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sharedMyManager;</span><br><span class="line">&#125;</span><br><span class="line">+ (<span class="keyword">id</span>)allocWithZone:(<span class="built_in">NSZone</span> *)zone &#123;</span><br><span class="line">    <span class="keyword">return</span> [[<span class="keyword">self</span> sharedManager] retain];</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">id</span>)copyWithZone:(<span class="built_in">NSZone</span> *)zone &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">id</span>)retain &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">unsigned</span>)retainCount &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">UINT_MAX</span>; <span class="comment">//denotes an object that cannot be released</span></span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">oneway</span> <span class="keyword">void</span>)release &#123;</span><br><span class="line">    <span class="comment">// never release</span></span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">id</span>)autorelease &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">id</span>)init &#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">self</span> = [<span class="keyword">super</span> init]) &#123;</span><br><span class="line">    someProperty = [[<span class="built_in">NSString</span> alloc] initWithString:<span class="string">@"Default Property Value"</span>];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">void</span>)dealloc &#123;</span><br><span class="line">    <span class="comment">// Should never be called, but just here for clarity really.</span></span><br><span class="line">    [someProperty release];</span><br><span class="line">    [<span class="keyword">super</span> dealloc];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+<p><a href="http://www.galloway.me.uk/tutorials/singleton-classes/" target="_blank" rel="external">原文在此</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+	
+		<li class="prev"><a href="/2013/10/20/2013-10-20-ios-touchevents-deliver/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2013/03/16/hello-world/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>[译]使用自定义视图控制器容器 | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="在过去的几个月，我有机会和很多不同项目领域的开发者们交流，交谈的结果是，甚至一些最有经验的开发者有时也会犹豫如何组织一个合适的视图控制器层次结构ViewController hierarchy。 
+精巧的设计一个好的导航模式navigation pattern是工程项目中极为重要的一部分，如果不脚下">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="[译]使用自定义视图控制器容器"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">[译]使用自定义视图控制器容器</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2013-12-15</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <p>在过去的几个月，我有机会和很多不同项目领域的开发者们交流，交谈的结果是，甚至一些最有经验的开发者有时也会犹豫如何组织一个合适的视图控制器层次结构<code>ViewController hierarchy</code>。 </p>
+<p>精巧的设计一个好的导航模式<code>navigation pattern</code>是工程项目中极为重要的一部分，如果不脚下留神的话，你将会很容易的掉进一个错综复杂的、不可控的、耦合性连接的迷宫里去－噩梦啊。很明显，你可以选择一个类似<code>UINavigationController</code>或者<code>UITabBarController</code>的标准的解决方案，但是有的时候这些都太简单，不够用。<br>随着iOS5的推出，苹果增加了一个值得被注意的特征，但看起来并没有太多开发者意识到：只要按照苹果建议的几条规则，你就能够通过创建一个自定义视图控制器容器，来创建一个更好更合适的导航。<br>让我们通过创建一个简单的应用来深入讨论下这个话题。</p>
+ <!--break-->
+<h2 id="控制器工厂">控制器工厂</h2><p>在这个空想出来基本无用的程序里，我们创建一个有无数控制器的导航，这些控制器能通过点击按钮来进行更新。</p>
+<p>下面的这个简单的原理图能帮助我们理解它是怎么工作的。<br><img src="http://www.thinkandbuild.it/wp-content/uploads/2013/07/schema_containment.png" alt="image"></p>
+<p>容器<code>Container</code>：这是一个UIViewController的子类，它有一个叫做detailView的子视图来作为其他控制器视图的容器，有一个按钮来呈现一个新的DetailController。当前DetailController的引用用currentDetailController的属性来存储。</p>
+<p>这是我们的 自定义控制器容器（Custom Container Controller），它的主要责任是明确怎么给用户呈现他的子元素（即容器内的控制器）</p>
+<p>详情<code>Detail</code>：这是一个简单的UIViewController，包含一个Label和一个UIGestureRecognizer。在它的视图上面滑动就可以随即改变Label的颜色。这样一个类，它的实例将会作为容器控制器的子元素。这个控制器的视图将会依附与容器的detaiView，但是它依然受DetailController管理，接收手势事件。</p>
+<p>在文章的末尾你会找到工程的源码，下载之后接着进行下面的步骤。</p>
+<h2 id="添加容器的子控制器">添加容器的子控制器</h2><p>在继续之前，先给Jack Flintermann表示致意，他是<a href="https://github.com/Grouper/FlatUIKit" target="_blank" rel="external">FlatUIKit</a>－一个能让标准UIKit组件变的更加强大的相当酷的库的作者。为了让这个例子更有型，我使用了这里面的一些类。</p>
+<p>打开文件 ContainerViewController，看一眼函数 presentDetailController。</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)presentDetailController:(<span class="built_in">UIViewController</span>*)detailVC&#123;</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//0. Remove the current Detail View Controller showed </span></span><br><span class="line">    <span class="keyword">if</span>(<span class="keyword">self</span><span class="variable">.currentDetailViewController</span>)&#123;</span><br><span class="line">        [<span class="keyword">self</span> removeCurrentDetailViewController];</span><br><span class="line">    &#125;</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//1. Add the detail controller as child of the container</span></span><br><span class="line">    [<span class="keyword">self</span> addChildViewController:detailVC];</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//2. Define the detail controller's view size</span></span><br><span class="line">    detailVC<span class="variable">.view</span><span class="variable">.frame</span> = [<span class="keyword">self</span> frameForDetailController];</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//3. Add the Detail controller's view to the Container's detail view and save a reference to the detail View Controller</span></span><br><span class="line">    [<span class="keyword">self</span><span class="variable">.detailView</span> addSubview:detailVC<span class="variable">.view</span>];</span><br><span class="line">    <span class="keyword">self</span><span class="variable">.currentDetailViewController</span> = detailVC;</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//4. Complete the add flow calling the function didMoveToParentViewController</span></span><br><span class="line">    [detailVC didMoveToParentViewController:<span class="keyword">self</span>];</span><br><span class="line"> </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>step 0：<br>step 0的注释后面再解释，实际上我们就是把当前显示的DetailController从层级结构中移除。</p>
+</li>
+<li><p>step1:<br>函数 addChildViewController是iOS5之后为自定义容器新加的函数集合中的一部分。就这么简单，我们就把一个新的DetailController作为子元素添加到了控制器容器中。</p>
+</li>
+<li><p>step2:<br>新的Detail Controller的视图将要与之前定义的容器中的视图绑定。我们可以先检查一下它的尺寸（Frame），如果需要可以改变。</p>
+</li>
+<li><p>step3:<br>将Detail的视图和容器的detailView进行绑定，然后把新的Detail Controller作为当前Detail Controller</p>
+</li>
+<li><p>step4:<br>函数 didMoveToParentViewController 也是UIVieController类新增加的。多亏有这个函数，我们可以给Detail Coontroller对象发送消息来确定已经是另一个控制器的子控制器了</p>
+</li>
+</ul>
+<h2 id="移除容器中的子控制器">移除容器中的子控制器</h2><p>现在，在相同的文件中，检查函数 <code>-(void) removeCurrentDetailViewController</code></p>
+<ul>
+<li><p>Step1<br>我们给当前的Detail controller发送消息：willMoveToParentViewController，参数为<strong>nil</strong>，通知大家它将要从它的父层级结构中移除。这条消息也是iOS新加的函数集中的一部分。</p>
+</li>
+<li><p>Step2<br>将当前DetailController的视图从其父视图中移除</p>
+</li>
+<li><p>Step3<br>调用标准函数 removeFromParentViewController ，我们就把当前的Detail Controller从容器中移除了。<br>当这个函数被调用的时候，系统会自动给Detail Controller发送一条参数为nil的消息：didMoveToParentViewController</p>
+</li>
+</ul>
+<h2 id="结论">结论</h2><p>第一个DetailController是在控制器容器里面的 viewDidLoad 函数里创建的。方法 <code>initWithString:withColor</code> 能够帮助我们创建一个 DetailViewController 的实例，借助于 presentDetailController 我们可以把这个实例添加到当前DetailController中</p>
+<p>上面已经提到，由你来决定什么时候点击容器控制器主视图里的按钮来呈现一个新的DetailController。这个按钮和 <code>addDetailController</code> 连接在一起，它的代码相当简单：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="keyword">IBAction</span>)addDetailController:(<span class="keyword">id</span>)sender &#123;</span><br><span class="line">    DetailViewController *detailVC = [[DetailViewController alloc]initWithString:<span class="string">@"This is a new viewController!"</span> withColor:[<span class="built_in">UIColor</span> asbestosColor]];</span><br><span class="line">     </span><br><span class="line">    <span class="comment">/* Mode 1 */</span></span><br><span class="line">    [<span class="keyword">self</span> presentDetailController:detailVC];</span><br><span class="line">     </span><br><span class="line">    <span class="comment">/* Mode 2 */</span></span><br><span class="line">    <span class="comment">//[self swapCurrentControllerWith:detailVC];</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>实质上，它创建了一个新的DetailViewController，然后调用了函数 <code>presentDetailController</code></p>
+<p>你可以编译运行，点击按钮“New Controller”来创建一个新的DetailController，在视图上面滑动来改变标签的颜色</p>
+<h2 id="增加过渡效果">增加过渡效果</h2><p>控制器的切换我们还完全没有注意到。通过创建一组动画来让新控制器的推送变的更加清晰是一个不错的主意。</p>
+<p>不用两个独立的增加和移除DetailController方法，我们把所有的操作都放在一个单独的函数中，我们叫它 <code>swapCurrentControllWith：</code>让要推送的控制器作为输入参数。<br>下面是完整的代码和注释：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)swapCurrentControllerWith:(<span class="built_in">UIViewController</span>*)viewController&#123;</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//1. The current controller is going to be removed</span></span><br><span class="line">    [<span class="keyword">self</span><span class="variable">.currentDetailViewController</span> willMoveToParentViewController:<span class="literal">nil</span>];</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//2. The new controller is a new child of the container</span></span><br><span class="line">    [<span class="keyword">self</span> addChildViewController:viewController];</span><br><span class="line">     </span><br><span class="line">    <span class="comment">//3. Setup the new controller's frame depending on the animation you want to obtain</span></span><br><span class="line">    viewController<span class="variable">.view</span><span class="variable">.frame</span> = <span class="built_in">CGRectMake</span>(<span class="number">0</span>, <span class="number">2000</span>, viewController<span class="variable">.view</span><span class="variable">.frame</span><span class="variable">.size</span><span class="variable">.width</span>, viewController<span class="variable">.view</span><span class="variable">.frame</span><span class="variable">.size</span><span class="variable">.height</span>);</span><br><span class="line"> </span><br><span class="line">    <span class="comment">//The transition automatically removes the old view from the superview and attaches the new controller's view as child of the</span></span><br><span class="line">    <span class="comment">//container controller's view</span></span><br><span class="line">     </span><br><span class="line">    <span class="comment">//Save the button position... we'll need it later</span></span><br><span class="line">    <span class="built_in">CGPoint</span> buttonCenter = <span class="keyword">self</span><span class="variable">.button</span><span class="variable">.center</span>;</span><br><span class="line">     </span><br><span class="line">    [<span class="keyword">self</span> transitionFromViewController:<span class="keyword">self</span><span class="variable">.currentDetailViewController</span> toViewController:viewController</span><br><span class="line">                              duration:<span class="number">1.3</span> options:<span class="number">0</span></span><br><span class="line">                            animations:^&#123;</span><br><span class="line">                                 </span><br><span class="line">                                <span class="comment">//The new controller's view is going to take the position of the current controller's view</span></span><br><span class="line">                                viewController<span class="variable">.view</span><span class="variable">.frame</span> = <span class="keyword">self</span><span class="variable">.currentDetailViewController</span><span class="variable">.view</span><span class="variable">.frame</span>;</span><br><span class="line">                                 </span><br><span class="line">                                <span class="comment">//The current controller's view will be moved outside the window</span></span><br><span class="line">                                <span class="keyword">self</span><span class="variable">.currentDetailViewController</span><span class="variable">.view</span><span class="variable">.frame</span> = <span class="built_in">CGRectMake</span>(<span class="number">0</span>,</span><br><span class="line">                                                                                         -<span class="number">2000</span>,</span><br><span class="line">                                                                                         <span class="keyword">self</span><span class="variable">.currentDetailViewController</span><span class="variable">.view</span><span class="variable">.frame</span><span class="variable">.size</span><span class="variable">.width</span>,</span><br><span class="line">                                                                                         <span class="keyword">self</span><span class="variable">.currentDetailViewController</span><span class="variable">.view</span><span class="variable">.frame</span><span class="variable">.size</span><span class="variable">.width</span>);</span><br><span class="line">                                 </span><br><span class="line">                                <span class="keyword">self</span><span class="variable">.button</span><span class="variable">.center</span> = <span class="built_in">CGPointMake</span>(buttonCenter<span class="variable">.x</span>,<span class="number">1000</span>);</span><br><span class="line">                                 </span><br><span class="line"> </span><br><span class="line">                            &#125; completion:^(<span class="built_in">BOOL</span> finished) &#123;</span><br><span class="line">                                <span class="comment">//Remove the old view controller</span></span><br><span class="line">                                [<span class="keyword">self</span><span class="variable">.currentDetailViewController</span> removeFromParentViewController];</span><br><span class="line">                                 </span><br><span class="line">                                <span class="comment">//Set the new view controller as current</span></span><br><span class="line">                                <span class="keyword">self</span><span class="variable">.currentDetailViewController</span> = viewController;</span><br><span class="line">                                [<span class="keyword">self</span><span class="variable">.currentDetailViewController</span> didMoveToParentViewController:<span class="keyword">self</span>];</span><br><span class="line">                                 </span><br><span class="line">                                <span class="comment">//reset the button position</span></span><br><span class="line">                                [<span class="built_in">UIView</span> animateWithDuration:<span class="number">0.5</span> animations:^&#123;</span><br><span class="line">                                    <span class="keyword">self</span><span class="variable">.button</span><span class="variable">.center</span> = buttonCenter;</span><br><span class="line">                                &#125;];</span><br><span class="line">                                 </span><br><span class="line">                            &#125;];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们把“present”和“remove”两个动作放在了上面提到的同一个函数里，在这个函数里，使用函数 <code>animateWithDuration:animations:completion</code> 我们可以使用一些简单的动画来交换当前控制器的视图和新控制器的视图。</p>
+<p>（为了看到结果，你得把函数 addDetailController 中的Mode2的注释去掉，然后再注释掉Mode1）</p>
+<h2 id="总结">总结</h2><p>下面是一个简单的流程图来重述一下添加和移除一个子控制器的步骤。这个几乎是所有以后要创建的导航模式的基本步骤。</p>
+<blockquote>
+<ul>
+<li><code>Current detail controller:</code> [current willMoveToParentViewController:nil]</li>
+<li><code>Next detail controller:</code>[container addChildViewController:next]</li>
+<li><code>Next detail controller:</code> [next willMoveToParentViewController:self] (Automatically called by point 2)</li>
+<li><code>Next detail controller:</code>[container.view addSubview:next.view]</li>
+<li><code>Current detail controller:</code> [current.view removeFromSuperView]</li>
+<li><code>Current detail controller:</code> [current removeFromParentViewController]</li>
+<li><code>Current detail controller:</code>[current didMoveToParentViewController:nil] (automatically called by point 5)</li>
+<li><code>Next detail controller:</code> [next didMoveToParentViewController:self]</li>
+</ul>
+</blockquote>
+<p>使用这些“新”函数，你可以创建任何一个导航模式。UINavigationController和UITabBarController很明显是相当的控制器容器的例子，他们有不同的逻辑和用法，但是在最终是在同一时刻给用户呈现一个控制器这一点上是一致的。</p>
+<p>另一个容器控制器的例子是 UISplitViewController，它可以在同一时刻呈现两个控制器</p>
+<p>简单的说，你的自定义容器本质上就是负责明确哪一个控制器应该被呈现，用户怎么样才能在控制器之间进行切换。</p>
+<p>我喜欢这个过程，当我使用容器去创建自定义导航模式的时候我感到安全，因为我能够确定我在使用正确的工具。再补充一点，使用这个技术，你能够确保设备在旋转的时候立即更新层级结构中的视图。</p>
+<p>就到这里，在Twitter上保持联系，如果有问题或者建议随后和我联系。<br>再见！</p>
+<p><a href="https://github.com/ariok/TB_ControllerContainment" target="_blank" rel="external">下载源代码</a></p>
+<p><a href="https://twitter.com/bitwaker" target="_blank" rel="external">Follow @bitwaker</a></p>
+<p> <a href="http://www.thinkandbuild.it/working-with-custom-container-view-controllers/" target="_blank" rel="external">原文在此</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2013/12/18/2013-12-18-multi-threading-programming-of-ios-part-1/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2013/10/20/2013-10-20-ios-touchevents-deliver/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>

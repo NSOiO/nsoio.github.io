@@ -1,0 +1,234 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>OC对象模型及运行时(1/3)－对象模型 | NSOiO</title>
+  <meta name="author" content="Lao Dai">
+  
+  <meta name="description" content="Objective-C 类和对象的声明Objective-C的Runtime是开源的，在Obj4-532.2之后，NSObject也开源了，可以在这里下载下面的代码就是节选自最新的代码551.1.
+123456789//objc.htypedef struct objc_class *Class;/">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="OC对象模型及运行时(1/3)－对象模型"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/favicon.jpg" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">OC对象模型及运行时(1/3)－对象模型</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2014-01-10</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
+	<!-- toc -->
+<script type="text/javascript">
+		jQuery(document).ready(function() {
+ 		   generateWikiTOC('.note', '.toc',  2 , 2 );
+		});
+</script>
+  </div><!-- col-md-3 -->
+  
+  
+
+  
+  <div class="col-xs-12 col-sm-9 col-md-9 note">
+	
+
+	  <!-- content -->
+	  <h3 id="Objective-C_类和对象的声明">Objective-C 类和对象的声明</h3><p>Objective-C的Runtime是开源的，在Obj4-532.2之后，NSObject也开源了，可以在<a href="http://www.opensource.apple.com/tarballs/objc4/" target="_blank" rel="external">这里下载</a><br>下面的代码就是节选自最新的代码551.1.</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//objc.h</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="keyword">struct</span> objc_class *Class;<span class="comment">//代表类 Objective-C class</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="keyword">struct</span> objc_object *<span class="keyword">id</span>;<span class="comment">//代表对象，也就是类的实例 instance of a class.</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//NSObject.h -- NSProxy.h</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">NSObject</span> &lt;<span class="title">NSObject</span>&gt; </span>&#123;</span><br><span class="line">    Class isa  OBJC_ISA_<span class="built_in">AVAILABILITY</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//runtime.h</span></span><br><span class="line"><span class="keyword">struct</span> objc_object &#123;</span><br><span class="line">    Class isa  OBJC_ISA_<span class="built_in">AVAILABILITY</span>;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> objc_class &#123;</span><br><span class="line">    Class isa  OBJC_ISA_<span class="built_in">AVAILABILITY</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<!--break-->
+<p>在objc.h里，声明了两个类型：<code>Class</code>和<code>id</code>，分别代表<code>Objective-C</code>（以下简称<code>OC</code>）类和实例对象,可以看作是<code>泛型</code>。在<code>runtime.h</code>中，我们看到OC类和对象其实就是两个结构体，其中第一个变量就是一个<strong>指向自己所属类的<code>isa</code>指针。</strong></p>
+<p>所以根据上面的声明，<strong>在OC中，一个对象的类由它的 isa 指针决定，isa 指针指向这个对象所属的Class。</strong>或者可以这么说：<strong>凡是首地址是isa指针的结构体，都可看作OC类。</strong></p>
+<p>当然后一句是不严谨的，根据下面的代码，我们发现，一个OC对象，还要包含<code>ISA(),initIsa(),getIsa(),changeIsa()</code>等5个方法。理所当然的，在NSObject.h中，NSObject也包含了一个isa指针。</p>
+<h3 id="Objective-C_类和对象的定义">Objective-C 类和对象的定义</h3><figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//objc-private.h</span></span><br><span class="line"><span class="keyword">struct</span> objc_object &#123;</span><br><span class="line">private:</span><br><span class="line">    uintptr_t isa; <span class="comment">//isa 指针，如果不是TaggedPointer，指向 Class</span></span><br><span class="line"></span><br><span class="line">public:</span><br><span class="line"></span><br><span class="line">    <span class="comment">// ISA() assumes this is NOT a tagged pointer object</span></span><br><span class="line">    Class ISA() </span><br><span class="line">    &#123;</span><br><span class="line">        assert(!isTaggedPointer()); </span><br><span class="line">        <span class="keyword">return</span> (Class)isa; </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// getIsa() allows this to be a tagged pointer object</span></span><br><span class="line">    Class getIsa() </span><br><span class="line">    &#123;</span><br><span class="line"><span class="preprocessor">#if SUPPORT_TAGGED_POINTERS</span></span><br><span class="line">        <span class="keyword">if</span> (isTaggedPointer()) &#123;</span><br><span class="line">            uintptr_t slot =</span><br><span class="line">                ((uintptr_t)<span class="keyword">this</span> &gt;&gt; TAG_SLOT_SHIFT) &amp; TAG_SLOT_MASK;</span><br><span class="line">            <span class="keyword">return</span> objc_tag_classes[slot];</span><br><span class="line">        &#125;</span><br><span class="line"><span class="preprocessor">#endif</span></span><br><span class="line">        <span class="keyword">return</span> ISA();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// changeIsa() should be used to change the isa of existing objects.</span></span><br><span class="line">    <span class="comment">// If this is a new object, use initIsa() for performance.</span></span><br><span class="line">    Class changeIsa(Class cls);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// initIsa() should be used to init the isa of new objects only.</span></span><br><span class="line">    <span class="comment">// If this object already has an isa, use changeIsa() for correctness.</span></span><br><span class="line">    <span class="keyword">void</span> initIsa(Class cls) </span><br><span class="line">    &#123; </span><br><span class="line">        assert(!isTaggedPointer()); </span><br><span class="line">        isa = (uintptr_t)cls; </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">bool</span> isTaggedPointer() </span><br><span class="line">    &#123;</span><br><span class="line"><span class="preprocessor">#if SUPPORT_TAGGED_POINTERS</span></span><br><span class="line">        <span class="keyword">return</span> ((uintptr_t)<span class="keyword">this</span> &amp; TAG_MASK);</span><br><span class="line"><span class="preprocessor">#else</span></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"><span class="preprocessor">#endif</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//objc-runtime-new.h</span></span><br><span class="line"><span class="keyword">struct</span> objc_class : objc_object &#123;</span><br><span class="line">    <span class="comment">// Class ISA;</span></span><br><span class="line">    Class superclass;</span><br><span class="line">    cache_t cache;</span><br><span class="line">    uintptr_t data_NEVER_USE; </span><br><span class="line">    <span class="comment">/*....省略若干方法...*/</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>OC的对象定义在objc－private.h中，除了isa指针外，还包含了另外5个方法，简单说下其中两个：</p>
+<ul>
+<li><p>getIsa()是获取isa指针的方法，如果isa不是TaggedPointer，则将isa转为Class类型返回；如果isa是TaggedPointer，则返回经过计算的指针。关于TaggedPinter的内容，可以参考唐巧的<a href="http://blog.devtang.com/blog/2014/03/21/weak_object_lifecycle_and_tagged_pointer/" target="_blank" rel="external">博文</a></p>
+</li>
+<li><p>changeIsa() 。。可能和isa swizzle 有关，以后再说</p>
+</li>
+</ul>
+<h3 id="OC对象模型分析">OC对象模型分析</h3><p>OC的类的定义在objc-runtime-new.h中，比较特殊，它是继承自OC对象，所以所有的OC类都可以看作是对象—<code>元类</code>的对象；OC类还增加了包括<code>superClass</code>指针和和方法列表缓存<code>cache_t cache</code>等，superClass指向父类，方法cache是为了提高访问效率而设定的，用来缓存调用过的方法，这样下次再调用的时候就能提高查找效率。所以在运行时，通过isa指针就能找到真正调用的方法，其isa指针和superClass指针的指向关系如下图所示：</p>
+<p><img src="/images/objctree.png" alt="!image"></p>
+<p><br><br>根据上图，我们可以看到：</p>
+<ul>
+<li><p>创建一个OC类其实是创建一个类对（ClassPair）－类和元类，类的isa指针指向元类，元类的isa指向根元类，即图中的NSObject元类，根元类的isa指向它自己，形成闭环，保证isa指针永远不会为空  —同时这也会使得一个类（Class）可以<br>  响应<code>NSObject</code>的所有<strong>实例方法</strong>  </p>
+</li>
+<li><p>isa指针指向就是消息传递的方向，如果通过isa指针没找到此消息，则继续通过superClass指针查找，如下图所示。</p>
+</li>
+<li><p>类中含有实例方法列表，元类中含有类方法列表；NSObject元类的superClass指向NSObject实例，所以，理论上给元类发消息，能找到NSObject的实例方法。</p>
+</li>
+</ul>
+<p>为什么要有元类呢？一是可以分离类方法和实例方法；二是元类总是会保证 Class 对象会有从基类继承的所有的的实例和类方法。</p>
+<h3 id="运行时的消息传递">运行时的消息传递</h3><p><img src="https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Art/messaging1.gif" alt="!image"></p>
+<h3 id="在运行时动态创建一个类">在运行时动态创建一个类</h3><p>动态创建一个类，需要三个步骤：</p>
+<blockquote>
+<ul>
+<li><font size="3px">1、为“class pair”－类和元类 创建存储空间（使用 objc_allocateClassPair).</font></li>
+<li><font size="3px">2、为这个类添加所需的 methods 和 ivars（使用 class_addMethod).</font></li>
+<li><font size="3px">3、注册这个类，然后就可以使用了（使用 objc_registerClassPair).</font>
+
+</li>
+</ul>
+</blockquote>
+<p>下面的代码在运行时创建了一个 NSError 的子类同时为它添加了一个方法：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">Class newClass =</span><br><span class="line">    objc_allocateClassPair([<span class="built_in">NSError</span> class], <span class="string">"RuntimeErrorSubclass"</span>, <span class="number">0</span>);</span><br><span class="line">class_addMethod(newClass, <span class="keyword">@selector</span>(report), (IMP)ReportFunction, <span class="string">"v@:"</span>);</span><br><span class="line">objc_registerClassPair(newClass);</span><br></pre></td></tr></table></figure>
+<p>添加的方法使用叫 ReportFunction 的函数作为实现，定义如下：</p>
+<figure class="highlight obj-c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">void</span> ReportFunction(<span class="keyword">id</span> <span class="keyword">self</span>, SEL _cmd)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@"This object is %p."</span>, <span class="keyword">self</span>);</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@"Class is %@, and super is %@."</span>, [<span class="keyword">self</span> class], [<span class="keyword">self</span> superclass]);</span><br><span class="line"> </span><br><span class="line">    Class currentClass = [<span class="keyword">self</span> class];</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; <span class="number">5</span>; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">NSLog</span>(<span class="string">@"Following the isa pointer %d times gives %p"</span>, i, currentClass);</span><br><span class="line">        currentClass = object_getClass(currentClass);</span><br><span class="line">    &#125;</span><br><span class="line"> </span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@"NSObject's class is %p"</span>, [<span class="built_in">NSObject</span> class]);</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@"NSObject's meta class is %p"</span>, object_getClass([<span class="built_in">NSObject</span> class]));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="isa_swizzling">isa swizzling</h3><p><code>KVO</code>（key－value observer）就是通过<code>isa swizzling</code>来实现的。<br>当我们为一个类的某个属性添加observer时候，框架自动创建这个类的一个子类，并且修改这个类的isa指向这个新的子类。<br>由于在ios中函数调用都是转化为isa查表形式，所以这次查得时新的子类的表，<br>也就是说对类的函数调用被子类给拦截了，在拦截的实现中就可以通知observer了。</p>
+<p>修改类的isa被称为isa-swizzling技术。isa-swizzling就是类型混合指针机制。KVO主要通过isa-swizzling，来实现其内部查找定位的。</p>
+<h3 id="参考资料：">参考资料：</h3><p>1.<a href="http://blog.ibireme.com/2013/11/25/objc-object/" target="_blank" rel="external">Objective-C中的类和对象(instance)</a></p>
+<p>2.<a href="http://blog.devtang.com/blog/2013/10/15/objective-c-object-model/" target="_blank" rel="external">Objective-C对象模型及应用</a></p>
+<p>3.<a href="http://www.cocoawithlove.com/2010/01/what-is-meta-class-in-objective-c.html" target="_blank" rel="external">what is meta class in objective-c</a></p>
+<p>4.<a href="http://blog.jobbole.com/53824/" target="_blank" rel="external">Objective-C 中的 Meta-class 是什么？</a></p>
+<p>5.<a href="http://blog.eddie.com.tw/2013/12/05/object-class-and-meta-class-in-objective-c/" target="_blank" rel="external">Object, Class and Meta Class in Objective-C</a></p>
+<p>6.<a href="https://developer.apple.com/library/ios/documentation/Cocoa/Reference/ObjCRuntimeRef/Reference/reference.html" target="_blank" rel="external">Objective-C Runtime Reference</a></p>
+<p>7.<a href="http://www.devdiv.com/kvo_kvc_-blog-1-51842.html" target="_blank" rel="external">KVO/KVC 实现原理进一步分析</a><br>8.<a href="http://blog.csdn.net/wzzvictory/article/details/9674431" target="_blank" rel="external">KVC/KVO原理详解及编程指南</a></p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2014/01/11/2014-01-11-objc-object-model-and-runtime-2/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2014/01/01/2014-01-01-multi-threading-programming-of-ios-part-3/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+	
+  </div><!-- row -->
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Lao Dai
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+</body>
+</html>
