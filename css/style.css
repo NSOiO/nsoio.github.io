@@ -58,6 +58,7 @@ body {
 .page{
   /*这里修改征文字体大小和颜色*/
   font-size: 1.1em;
+  /*font-size: 16px;*/
   color: #4b4b4b;
   margin: 1.0em 0em;
   padding-top: 25px;
@@ -66,7 +67,7 @@ body {
   font-family: 'Open Sans',"Helvetica Neue", "Helvetica","Microsoft YaHei", "WenQuanYi Micro Hei", Arial, sans-serif;
   
   */
-  font-family: Helvetica, Tahoma,'Open Sans',"Helvetica Neue", "Helvetica","Microsoft YaHei", "WenQuanYi Micro Hei", Arial, sans-serif;
+  font-family: sans-serif,Helvetica, Tahomahe,'Open Sans',"Helvetica Neue", "Helvetica", "WenQuanYi Micro Hei", Arial, sans-serif;
 }
 
 .page p{
