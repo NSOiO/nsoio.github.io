@@ -1,0 +1,217 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Method Swizzling 需要注意的几个问题 | NSOiO</title>
+  <meta name="author" content="Deepak">
+  
+  <meta name="description" content="Method Swizzling利用iOS运行时提供的API，我们可以实现Method Swizzling功能，利用Method Swizzling，我们可以实现hook给系统或者第三方库添加自己特定的实现；在单元测试、AOP及DI编程中更是常见。但是在使用它的时候，我们要十分的谨慎小心，NSHip">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <meta property="og:title" content="Method Swizzling 需要注意的几个问题"/>
+  <meta property="og:site_name" content="NSOiO"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  
+    <link rel="alternative" href="/atom.xml" title="NSOiO" type="application/atom+xml">
+  
+  
+    <link href="/img/favicon.ico" rel="icon">
+  
+  
+  <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/font-awesome.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/highlight.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/google-fonts.css" media="screen" type="text/css">
+  <link rel="stylesheet" href="/css/responsive.css" media="screen" type="text/css">  
+  <link rel="stylesheet" href="/css/sidenav.css" media="screen" type="text/css">  
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+
+  <script src="/js/jquery-2.0.3.min.js"></script>
+
+  <!-- analytics -->
+  
+<script type="text/javascript">
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', '[object Object]']);
+_gaq.push(['_trackPageview']);
+(function() {
+var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+
+ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'stats.g.doubleclick.net/dc.js';
+
+var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+
+
+</head>
+
+<body id="body" data-spy="scroll" data-target=".toc">
+  <div class="container" id="container">
+	<div class="content">
+	  <div class="page-header">		
+  <h1><a class="brand" href="/">NSOiO</a><span class="split"></span><span class="title">Method Swizzling 需要注意的几个问题</span><span class="date" id="title-date"><i class="fa fa-clock-o"></i> 2014-01-28</span></h1>
+</div>		
+
+<div class="row page">
+  <!-- cols -->	
+  
+
+
+
+  
+	<div class="col-md-12">
+	  
+
+	  <!-- content -->
+	  <h2 id="Method_Swizzling">Method Swizzling</h2><p>利用iOS运行时提供的API，我们可以实现<code>Method Swizzling</code>功能，利用<code>Method Swizzling</code>，我们可以实现<code>hook</code>给系统或者第三方库添加自己特定的实现；在单元测试、AOP及DI编程中更是常见。但是在使用它的时候，我们要十分的谨慎小心，<a href="http://nshipster.com/method-swizzling/index.html?#main" target="_blank" rel="external">NSHipster</a>的文章和<a href="http://stackoverflow.com/questions/5339276/what-are-the-dangers-of-method-swizzling-in-objective-c" target="_blank" rel="external">StackOverFlow</a>上的一篇问答也都说明了这一点。<code>Method Swizzling</code>的局限性主要包括：</p>
+<ul>
+<li>（1）不是线程安全的</li>
+<li>（2）改变了代码本来的行为</li>
+<li>（3）da潜在的命名冲突</li>
+<li>（4）改变了参数<code>_cmd</code>，如果方法中依赖了<code>_cmd</code>，则可能会有问题</li>
+<li>（5）继承问题，如果swizzle的顺序没有按照父-&gt;子的顺序，可能会导致父类的swizzle失效，程序Crash，或者方法在执行过程中不是按照从子-&gt;父的顺序。</li>
+<li>（6）难以理解和调试</li>
+</ul>
+<p>下面分析几种常见的<code>Method Swizzling</code>的实现方法及各自局限性。</p>
+<h2 id="Method_Swizzling_的实现方法及其局限性">Method Swizzling 的实现方法及其局限性</h2><p>不同的实现方法分别来自于<a href="https://github.com/forkingdog/UITableView-FDTemplateLayoutCell/blob/master/Classes%2FUITableView%2BFDTemplateLayoutCell.m#L280" target="_blank" rel="external">UITableView-FDTemplateLayoutCell</a>，<a href="http://nshipster.com/method-swizzling/index.html?#main" target="_blank" rel="external">NSHipster</a>，<a href="https://github.com/rentzsch/jrswizzle/blob/semver-1.x/JRSwizzle.m#L32" target="_blank" rel="external">JRSwizzle</a>，以及<a href="http://stackoverflow.com/questions/5339276/what-are-the-dangers-of-method-swizzling-in-objective-c" target="_blank" rel="external">StackOverFlow</a>，NSHipster和JRSwizzle的实现核心逻辑差不多，我们这里就以NSHipster的实现为例，以下我们简称<code>FD的实现</code>,<code>NH的实现</code>，<code>SO的实现</code>；几种实现共同的问题都包含上面的<code>1，2，6</code>，这里就不再累述。</p>
+<h3 id="FD的实现">FD的实现</h3><p>我们把代码提取出来是下面这个样子：<br><figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> MethodSwizzle(Class <span class="keyword">self</span>, SEL origSel_, SEL altSel_)&#123;</span><br><span class="line">    </span><br><span class="line">    Method origMethod = class_getInstanceMethod(<span class="keyword">self</span>, origSel_);</span><br><span class="line">    Method altMethod = class_getInstanceMethod(<span class="keyword">self</span>, altSel_);</span><br><span class="line"> </span><br><span class="line">    method_exchangeImplementations(origMethod, altMethod);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>它的问题主要有<code>3，4，5</code>，命名冲突和改变<code>_cmd</code>会导致潜在的隐患。这里主要说下继承问题。<br>假设这样一种场景，父类A中实现了<code>foo</code>方法，在扩展中的<code>＋load</code>中进行了swizzle，swizzling方法是<code>A_foo</code>，子类B在<code>+load</code>中也对<code>foo</code>进行了swizzle，swizzling方法是<code>B_foo</code>，在向对象B发送消息的时候，我们期望的执行顺序是<code>B_foo -&gt; A_foo -&gt; foo</code>,但是实际的执行顺序却是<code>A_foo -&gt; B_foo -&gt; foo</code>,顺序与我们的期望的不符，不过还好三个方法全都执行了。顺序异常的原因是<code>+load</code>方法的的执行顺序是先执行类中的实现，再执行扩展中的实现，这一点可以通过运行时开源代码中的<code>call_load_methods</code>看到。</p>
+<p>第二个问题是如果<code>foo</code>方法是<code>dealloc</code>方法，并且A类中没有实现<code>dealloc</code>方法，FD的实现则会在ARC下导致程序的Crash。原因可能是</p>
+<h3 id="NH的实现">NH的实现</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> MethodSwizzle(Class <span class="keyword">self</span>, SEL origSel_, SEL altSel_)&#123;</span><br><span class="line">    </span><br><span class="line">    Method origMethod = class_getInstanceMethod(<span class="keyword">self</span>, origSel_);</span><br><span class="line">    Method altMethod = class_getInstanceMethod(<span class="keyword">self</span>, altSel_);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span>(class_addMethod(<span class="keyword">self</span>, origSel_, method_getImplementation(altMethod), method_getTypeEncoding(altMethod)))</span><br><span class="line">        class_replaceMethod(<span class="keyword">self</span>, altSel_, method_getImplementation(origMethod), method_getTypeEncoding(origMethod));</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        method_exchangeImplementations(origMethod, altMethod);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>同样存在潜在的命名冲突及改变参数<code>_cmd</code>的问题<br>在上面第一个场景中，实际的执行顺序是<code>B_foo -&gt; foo</code>，由于先进行子类的swizzle，导致父类的swizzle失效.ReactiveCocoa也曾经出现过类似的问题，现在已经解决掉了。<br>在第二种情况下，当<code>foo</code>方法是<code>dealloc</code>方法，并且A类中没有实现的话，程序并不会Crash。</p>
+<h3 id="SO的实现">SO的实现</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">BOOL</span> class_swizzleMethodAndStore(Class class, SEL original, IMP replacement, I<span class="built_in">MPPointer</span> store) &#123;</span><br><span class="line">    IMP imp = <span class="literal">NULL</span>;</span><br><span class="line">    Method method = class_getInstanceMethod(class, original);</span><br><span class="line">    <span class="keyword">if</span> (method) &#123;</span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">char</span> *type = method_getTypeEncoding(method);</span><br><span class="line">        imp = class_replaceMethod(class, original, replacement, type);</span><br><span class="line">        <span class="keyword">if</span> (!imp) &#123;</span><br><span class="line">            imp = method_getImplementation(method);</span><br><span class="line">        &#125;</span><br><span class="line">       </span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (imp &amp;&amp; store) &#123; *store = imp; &#125;</span><br><span class="line">    <span class="keyword">return</span> (imp != <span class="literal">NULL</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">NSObject</span> (<span class="title">FRRuntimeAdditions</span>)</span></span><br><span class="line">+ (<span class="built_in">BOOL</span>)swizzle:(SEL)original with:(IMP)replacement store:(I<span class="built_in">MPPointer</span>)store &#123;</span><br><span class="line">    <span class="keyword">return</span> class_swizzleMethodAndStore(<span class="keyword">self</span>, original, replacement, store);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+<p>在上面两个场景中，实际的执行顺序和NH的实现是一样的，但是SO的实现通过静态函数解决了命名冲突的问题，通过直接调用IMP函数指针，解决了改变<code>_cmd</code>参数的问题。<br>但是这种C的写法写起来太过麻烦，而且同样存在上面说过的三者共同的问题。</p>
+<h2 id="RSSwizzle">RSSwizzle</h2><p>有没有一个能把上面的问题全部解决的方案呢？开源库<code>RSSwizzle</code>基本上可以把上面的问题全部解决掉。<a href="https://github.com/rabovik/RSSwizzle" target="_blank" rel="external">Github地址</a></p>
+<h2 id="总结">总结</h2><p><code>Method Swizzle</code>的使用和写法都非常灵活，如果确定需要这个功能的话，尽可能的把潜在问题考虑周全一点，FD的实现虽然有潜在问题，但是用在其代码中是没有问题的；如果使用场景要求较高，可以直接使用<a href="https://github.com/rabovik/RSSwizzle" target="_blank" rel="external">RSSwizzle</a>开源库。</p>
+	  
+
+	  <div>
+  		<center>
+		  <div class="pagination">
+<ul class="pagination">
+	
+	
+	
+	
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+			
+		
+	
+		
+			
+			
+			
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+		
+			
+		
+	
+	
+		<li class="prev"><a href="/2014/02/04/2014-02-04-shi-yong-coregraphicshui-zhi-zhong-jian-lou-kong-de-2dtu-xing-de-5chong-fang-fa/" class="alignleft prev"><i class="fa fa-arrow-circle-o-left"></i>prev</a></li>
+	
+	<li><a href="/"><i class="fa fa-archive"></i>Home</a></li>
+	
+		<li class="next"><a href="/2014/01/13/2014-01-13-objc-object-model-and-runtime-3/" class="alignright next">next<i class="fa fa-arrow-circle-o-right"></i></a></li>
+	
+</ul>
+</div>
+
+		</center>
+	  </div>
+	  
+	</div> <!-- col-md-9/col-md-12 -->
+
+  </div><!-- row -->
+
+
+
+	</div>
+  </div>
+  <div class="container-narrow">
+	<footer> <p>
+  &copy; 2015 Deepak
+  
+      with help from <a href="http://zespia.tw/hexo/" target="_blank">Hexo</a> and <a href="http://getbootstrap.com/" target="_blank">Twitter Bootstrap</a>. Theme by <a href="http://github.com/wzpan/hexo-theme-wixo/">Wixo</a>.    
+</p> </footer>
+  </div> <!-- container-narrow -->
+  
+<a id="gotop" href="#">   
+  <span>▲</span> 
+</a>
+
+<script src="/js/jquery.imagesloaded.min.js"></script>
+<script src="/js/gallery.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/jquery.tableofcontents.min.js"></script>
+<script src="/js/tocgenerator.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
+<script src="/fancybox/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+  $('.fancybox').fancybox();
+})(jQuery);
+</script>
+
+
+
+</body>
+</html>

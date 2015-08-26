@@ -64,21 +64,12 @@ var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga
 <div class="row page">
   <!-- cols -->	
   
-  <div class="col-xs-12 col-sm-3 col-md-3 toc"> 
-	<!-- toc -->
-<script type="text/javascript">
-		jQuery(document).ready(function() {
- 		   generateWikiTOC('.note', '.toc',  2 , 2 );
-		});
-</script>
-  </div><!-- col-md-3 -->
-  
 
 
 
   
-  <div class="col-xs-12 col-sm-9 col-md-9 note">
-	
+	<div class="col-md-12">
+	  
 
 	  <!-- content -->
 	  <p>RunLoop是一种事件处理循环机制，类似于中断处理，它可以监听一个或多个定时器源(Timer Sources)和输入源（Input Sources），当没有事件时，它让线程休眠；当有事件发生时，系统唤醒线程，把事件放入RunLoop队列，RunLoop再分发给用户指定的事件处理入口函数。由此可以看出，RunLoop是为了<code>低功耗</code>而设计的，它不会浪费CPU的时间，不会阻止CPU进入低功耗模式，对于对功耗敏感的移动终端来说，在恰当的场合使用它能让你的程序获得更好的性能。</p>
@@ -210,6 +201,10 @@ var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga
 	
 	
 	
+	
+		
+			
+		
 	
 		
 			
